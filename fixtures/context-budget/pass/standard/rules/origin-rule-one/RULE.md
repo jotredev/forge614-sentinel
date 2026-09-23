@@ -1,0 +1,3 @@
+# A short rule
+
+more
