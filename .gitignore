@@ -1,0 +1,86 @@
+# Dependencias
+node_modules/
+.bun/
+bun.lockb
+
+# Salidas de build y empaquetado (se regeneran con bun run standard:pack)
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Cobertura y reportes de pruebas
+coverage/
+.nyc_output/
+junit.xml
+test-results/
+
+# Variables de entorno y secretos (nunca se versionan)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Registros y temporales
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+*.temp
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+tmp/
+temp/
+.cache/
+
+# Sistema operativo: macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon?
+
+# Sistema operativo: Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Sistema operativo: Linux
+.directory
+.Trash-*
+
+# Editores e IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.iml
+*.sublime-workspace
+.fleet/
+.history/
+
+# Carpeta de trabajo de las sesiones de IA (briefs, snapshots, ledger); no es parte del producto
+.superpowers/
+
+# Archivos locales de configuración del usuario
+*.local
+.envrc
+.tool-versions.local
+
+# Fixtures de Sentinel: archivos falsos que las comprobaciones deben ver (nunca secretos reales)
+!fixtures/**/.env
+!fixtures/**/.env.*
+!fixtures/**/*.pem
+!fixtures/**/*.key

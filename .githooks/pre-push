@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Forge614 pre-push hook: run locally exactly what CI's verify workflow runs.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+bun run workflows:run --workflow verify

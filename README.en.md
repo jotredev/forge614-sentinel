@@ -1,14 +1,14 @@
 # Forge614 Sentinel (`forge614-sentinel`)
 
-> Analogía en una frase: <completar>.
+> One-sentence analogy: <fill in>.
 
-## Qué es
-Una frase.
+## What it is
+One sentence.
 
-## Qué no es
+## What it is not
 - …
 
-## Instalación
+## Installation
 
 macOS / Linux:
 ```bash
@@ -20,11 +20,11 @@ Windows (PowerShell):
 irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex
 ```
 
-## Documentación
+## Documentation
 | # | Español | English |
 | --- | --- | --- |
 | 00 | [Contrato](CONTRACT.md) | [Contract](CONTRACT.en.md) |
 | NN | [Workflows de integración y release](docs/es/NN-workflows.md) | [Integration and release workflows](docs/en/NN-workflows.md) |
 
-## Contrato
-Ver [`CONTRACT.md`](CONTRACT.md) (estándar 1.0.0).
+## Contract
+See [`CONTRACT.md`](CONTRACT.md) (standard 1.0.0).
