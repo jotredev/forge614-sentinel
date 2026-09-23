@@ -1,0 +1,1 @@
+{ "schemaVersion": 1, "name": "forge614-pack-ecosystem-node", "version": "1.0.0", "title": { "es": "Pack de prueba", "en": "Test pack" }, "rules": ["forge614-rule-package-naming"] }

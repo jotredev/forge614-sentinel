@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "forge614-rule-package-naming",
+  "version": "1.0.0",
+  "level": "core",
+  "title": { "es": "Nombres de paquetes origen-tipo-nombre", "en": "Package names origin-kind-name" },
+  "appliesWhen": [],
+  "validator": "package-naming",
+  "compensates": "structural",
+  "decisions": ["0016"]
+}

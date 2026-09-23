@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "forge614-rule-y",
+  "version": "1.0.0",
+  "level": "core",
+  "title": { "es": "Regla de prueba", "en": "Test rule" },
+  "appliesWhen": [],
+  "validator": "nope",
+  "decisions": ["0016"]
+}
