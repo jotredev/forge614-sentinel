@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "nodes": ["engines"],
+  "agents": ["codex"],
+  "cells": [
+    { "node": "engines", "agent": "codex", "status": "revalidate", "revalidateSince": "2026-07-01", "reason": "cambio de versión del asistente", "verifiedAt": "2026-07-01", "verifiedBy": "owner", "notes": "" }
+  ]
+}
