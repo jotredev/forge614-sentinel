@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "decisions": [
+    { "number": "0001", "slug": "a", "title": "Acta de ejemplo", "status": "aceptada", "date": "2026-09-22", "file": "0001-a.md" },
+    { "number": "0002", "slug": "b", "title": "Acta borrada", "status": "aceptada", "date": "2026-09-22", "file": "0002-b.md" },
+    { "number": "0003", "slug": "c", "title": "Otra acta", "status": "aceptada", "date": "2026-09-22", "file": "0003-c.md" }
+  ]
+}

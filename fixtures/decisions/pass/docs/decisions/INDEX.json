@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "decisions": [
+    { "number": "0001", "slug": "a", "title": "Acta de ejemplo", "status": "aceptada", "date": "2026-09-22", "file": "0001-a.md" }
+  ]
+}
