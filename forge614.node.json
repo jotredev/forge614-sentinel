@@ -3,8 +3,8 @@
   "node": "sentinel",
   "kind": "product",
   "standard": {
-    "version": "1.0.1",
-    "sha256": "ce5e3c395c5349df5bed12f87262ae7d4826c8c5753fd9e4257f80d81a01bbee"
+    "version": "1.0.2",
+    "sha256": "10d036f02f767d54b0b7d710e96b21b249e034b480b0d83be124df5b2f97a4f5"
   },
   "ecosystem": "forge614"
 }

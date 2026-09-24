@@ -33,4 +33,4 @@ irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/insta
 | — | [Contrato](CONTRACT.md) | [Contract](CONTRACT.en.md) |
 
 ## Contract
-See [`CONTRACT.md`](CONTRACT.md) (standard 1.0.1).
+See [`CONTRACT.md`](CONTRACT.md) (standard 1.0.2).
