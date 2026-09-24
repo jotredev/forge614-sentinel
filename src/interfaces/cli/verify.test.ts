@@ -21,3 +21,12 @@ test("--skip-tests runs typecheck, workflows:check and notion-map:build --check 
   for (const label of ["typecheck", "workflows:check", "notion-map:build --check"]) expect(r.stderr).toContain(`[verify] ${label}: exit 0`);
   expect(r.stderr).toContain("[verify] sentinel:check: exit ");
 });
+
+test("--skip-tests exits 0 with one JSON: every step green and the self-check verdict pass", () => {
+  const r = run(["bun", "run", CLI, "--skip-tests"], { cwd: REPO_ROOT, timeoutMs: 300_000 });
+  expect(r.exitCode, r.stderr).toBe(0);
+  const out = JSON.parse(r.stdout.trim());
+  expect(out).toMatchObject({ schemaVersion: 1, ok: true });
+  expect(out.steps.map((s: { label: string }) => s.label)).toEqual(["typecheck", "workflows:check", "notion-map:build --check", "sentinel:check"]);
+  expect(out.sentinel.verdict).toBe("pass");
+});

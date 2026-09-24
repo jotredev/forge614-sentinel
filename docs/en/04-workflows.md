@@ -5,7 +5,7 @@
 ## `verify.yml`
 | Job | Trigger | What it runs | What it validates | Expected duration |
 | --- | --- | --- | --- | --- |
-| `verify` | push to `main`, pull request | `bun install --frozen-lockfile`, `bun run verify` | typecheck, tests, standard validators, workflows | ~3 min |
+| `verify` | push to `main`, pull request | `bun install --frozen-lockfile`, `bun run verify` | typecheck, tests (unit and e2e with the compiled binary), `workflows:check`, `notion-map:build --check`, `sentinel:check` on this repository | ~3 min |
 | `parity` | push to `main`, pull request | `bun install --frozen-lockfile`, `bun run sentinel:parity` on `ubuntu-24.04`, `macos-15` and `windows-2025` | that the `check` report on `fixtures/pass-node` and `fixtures/fail-node` (without `durationMs`) is byte-for-byte the one in `fixtures/golden/` on the three systems | ~2 min per system |
 
 ## `release.yml`
