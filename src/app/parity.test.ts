@@ -6,7 +6,8 @@ import type { CheckReport } from "../modules/report";
 import { canonicalJson, normalizeReport, runParity } from "./parity";
 import { repoRoot } from "./repo";
 
-const options = { update: false, sentinelVersion: "0.1.0", today: "2026-09-23" };
+const PACKAGE_VERSION: string = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")).version;
+const options = { update: false, sentinelVersion: PACKAGE_VERSION, today: "2026-09-23" };
 
 // Needs the goldens of step 5; until they exist this test fails, which is
 // the expected red of this step.
