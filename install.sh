@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Forge614 node installer — rendered from forge614-ai/standard/templates/install.sh (standard 1.0.0).
+# Forge614 node installer — rendered from forge614-ai/standard/templates/install.sh (standard 1.0.1).
 # Usage: install.sh [--version X.Y.Z] [--archive path.tar.gz] [--uninstall]
 set -euo pipefail
 

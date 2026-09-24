@@ -71,7 +71,7 @@ Every data output is a single JSON object on stdout with `schemaVersion: 1`; eve
 | `RELEASE_PUBLISH_FAILED` | `release:publish`: `gh` could not run or the release was not created |
 
 ## Mandatory requirements for supported AI assistants
-`sentinel` section of `standard/procedures/new-agent-checklist.md` (standard 1.0.0): it does not exist because Sentinel does not integrate AI assistants; assistants consume its JSON report like any other tool.
+`sentinel` section of `standard/procedures/new-agent-checklist.md` (standard 1.0.1): it does not exist because Sentinel does not integrate AI assistants; assistants consume its JSON report like any other tool.
 
 ## Compatibility
 Breaking changes bump `schemaVersion`; one compatibility version is kept. `CheckReport` evolves additively (decision 0024): new fields are optional, never renamed or removed.
