@@ -1,4 +1,4 @@
-# Forge614 node installer (Windows) — rendered from forge614-ai/standard/templates/install.ps1 (standard 1.0.0).
+# Forge614 node installer (Windows) — rendered from forge614-ai/standard/templates/install.ps1 (standard 1.0.1).
 param([string]$Version = "", [string]$Archive = "", [switch]$Uninstall)
 $ErrorActionPreference = "Stop"
 $NodeName = "sentinel"; $Repo = "jotredev/forge614-sentinel"; $AssetPrefix = "forge614-sentinel"
