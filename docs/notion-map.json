@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "productVersion": "0.1.0",
+  "pages": [
+    {
+      "es": "docs/es/00-resumen-y-guia-rapida.md",
+      "en": "docs/en/00-summary-and-quickstart.md",
+      "sha256Es": "67ee75ec0e47411860af714ed90279fc1b012fecdcaa88967b4b0686ad3dedfa",
+      "sha256En": "7ef9872b9919ef39ef503cf3e274336c70c02d06a6322ad422d7940dafa0a0d7",
+      "notionPageId": null
+    },
+    {
+      "es": "docs/es/01-comprobaciones.md",
+      "en": "docs/en/01-checks.md",
+      "sha256Es": "8527795c3de5f2c2087c397013e6655e4c26e68f03a3ea89cf7365a36d17deaf",
+      "sha256En": "fcc8072f8c2a0f5db0e856819f217684c8804cc52e62c92f44b84f841675a115",
+      "notionPageId": null
+    },
+    {
+      "es": "docs/es/02-reglamento-y-cache.md",
+      "en": "docs/en/02-standard-and-cache.md",
+      "sha256Es": "c2ca1c86abfa404edd1c1634643941f89525bd053afaa9f7b17c42fed4ba5c2e",
+      "sha256En": "36058073e65f7d4310785a8bd7b76938b1d132685846ca0e5ea73f856cf77af2",
+      "notionPageId": null
+    },
+    {
+      "es": "docs/es/03-integracion.md",
+      "en": "docs/en/03-integration.md",
+      "sha256Es": "be4544a55a74e8b295b1d486fdc1c487f80c3acf92d4b545607d6113591311b7",
+      "sha256En": "86a4fb4ae6bfe0682d4c07a6fea86c4bd395155a08d650df2a248563c7916c1e",
+      "notionPageId": null
+    },
+    {
+      "es": "docs/es/04-workflows.md",
+      "en": "docs/en/04-workflows.md",
+      "sha256Es": "22e0459a2350c22bed7dc79c4767300d4ef291645bc915bdbb1735b09c4fc899",
+      "sha256En": "642148150374effaa4ace0f3cb440a1c54f0ef93e3e352b7964df734c96263dd",
+      "notionPageId": null
+    }
+  ]
+}
