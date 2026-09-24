@@ -1,0 +1,17 @@
+{
+  "name": "forge614-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "bun": ">=1.3.9" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "verify": "bun run src/interfaces/cli/verify.ts",
+    "workflows:check": "bun run src/interfaces/cli/workflows-check.ts",
+    "workflows:run": "bun run src/interfaces/cli/workflows-run.ts",
+    "build:target": "bun run src/interfaces/cli/build-target.ts",
+    "smoke:target": "bun run src/interfaces/cli/smoke-target.ts",
+    "release:publish": "bun run src/interfaces/cli/release-publish.ts"
+  }
+}
