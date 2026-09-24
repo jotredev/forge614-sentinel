@@ -71,7 +71,7 @@ Toda salida de datos es un solo objeto JSON en stdout con `schemaVersion: 1`; to
 | `RELEASE_PUBLISH_FAILED` | `release:publish`: `gh` no pudo ejecutarse o la release no se creó |
 
 ## Requisitos obligatorios para asistentes de IA soportados
-Sección `sentinel` de `standard/procedures/new-agent-checklist.md` (estándar 1.0.1): no existe porque Sentinel no integra asistentes de IA; los asistentes consumen su informe JSON como cualquier otra herramienta.
+Sección `sentinel` de `standard/procedures/new-agent-checklist.md` (estándar 1.0.2): no existe porque Sentinel no integra asistentes de IA; los asistentes consumen su informe JSON como cualquier otra herramienta.
 
 ## Compatibilidad
 Cambios incompatibles suben `schemaVersion`; se mantiene una versión de compatibilidad. `CheckReport` evoluciona de forma aditiva (acta 0024): campos nuevos opcionales, nunca renombrar ni quitar.

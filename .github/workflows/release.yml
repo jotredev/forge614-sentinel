@@ -43,3 +43,4 @@ jobs:
         with: { path: dist/release, merge-multiple: true }
       - run: bun install --frozen-lockfile
       - run: bun run release:publish
+        env: { GH_TOKEN: "${{ github.token }}" }
