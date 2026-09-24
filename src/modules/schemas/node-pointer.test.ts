@@ -20,4 +20,19 @@ describe("forge614.node.json", () => {
   test("rejects a non-canonical ecosystem name", () => {
     expect(NodePointerSchema.safeParse({ ...valid, ecosystem: "Forge_614" }).success).toBe(false);
   });
+  test("accepts an optional sentinel version (Plan A2, spec 2026-09-24 §4)", () => {
+    expect(NodePointerSchema.safeParse({ ...valid, sentinel: { version: "0.1.1" } }).success).toBe(true);
+  });
+  test("passes without sentinel (optional field)", () => {
+    expect(NodePointerSchema.safeParse({ ...valid, ecosystem: "forge614" }).success).toBe(true);
+  });
+  test("rejects a sentinel version that is not X.Y.Z", () => {
+    expect(NodePointerSchema.safeParse({ ...valid, sentinel: { version: "abc" } }).success).toBe(false);
+    expect(NodePointerSchema.safeParse({ ...valid, sentinel: { version: "v0.1.1" } }).success).toBe(false);
+  });
+  test("rejects a malformed sentinel object", () => {
+    expect(NodePointerSchema.safeParse({ ...valid, sentinel: {} }).success).toBe(false);
+    expect(NodePointerSchema.safeParse({ ...valid, sentinel: "0.1.1" }).success).toBe(false);
+    expect(NodePointerSchema.safeParse({ ...valid, sentinel: { version: "0.1.1", sha256: "a".repeat(64) } }).success).toBe(false);
+  });
 });
