@@ -8,7 +8,7 @@ El script `verify` del nodo corre, además de lo suyo, `forge614-sentinel check 
 
 ## En CI
 
-La plantilla `verify.yml` del estándar 1.1.0 (Plan A2) añade un paso `bun run sentinel:install` antes de `bun run verify`: descarga la release de Sentinel fijada en `forge614.node.json` (`sentinel.version`, campo opcional nuevo) para la plataforma del runner y verifica `SHA256SUMS`. Las releases son públicas: sin token no hay escritura. Este repositorio no se instala a sí mismo: su `verify` corre `check` desde el código fuente (`bun run sentinel:check`) contra la copia del reglamento en `fixtures/standard/`, cuya huella es la que fija `forge614.node.json`.
+La plantilla `verify.yml` del estándar 1.1.0 (Plan A2) añade un paso `bun run sentinel:install` antes de `bun run verify`: descarga la release de Sentinel fijada en `forge614.node.json` (`sentinel.version`, campo opcional nuevo) para la plataforma del runner y verifica `SHA256SUMS`. Las releases son públicas: sin token no hay escritura. Este repositorio no se instala a sí mismo: su `verify` corre `check` desde el código fuente (`bun run sentinel:check`) contra la copia del reglamento en `fixtures/standard/`, cuya huella es la que fija `forge614.node.json`. Sentinel acepta `sentinel.version` desde la 0.1.1; la 0.1.0 rechaza una credencial que lo traiga (`NODE_POINTER_INVALID`), porque su esquema es estricto. Por eso un nodo solo agrega el campo cuando fija una versión 0.1.1 o posterior.
 
 ## Códigos de salida y errores
 

@@ -8,7 +8,7 @@ The node's `verify` script runs, besides its own steps, `forge614-sentinel check
 
 ## In CI
 
-The `verify.yml` template of standard 1.1.0 (Plan A2) adds a `bun run sentinel:install` step before `bun run verify`: it downloads the Sentinel release pinned in `forge614.node.json` (`sentinel.version`, a new optional field) for the runner's platform and verifies `SHA256SUMS`. Releases are public: without a token there is no write access. This repository does not install itself: its `verify` runs `check` from the source code (`bun run sentinel:check`) against the copy of the standard in `fixtures/standard/`, whose fingerprint is the one `forge614.node.json` pins.
+The `verify.yml` template of standard 1.1.0 (Plan A2) adds a `bun run sentinel:install` step before `bun run verify`: it downloads the Sentinel release pinned in `forge614.node.json` (`sentinel.version`, a new optional field) for the runner's platform and verifies `SHA256SUMS`. Releases are public: without a token there is no write access. This repository does not install itself: its `verify` runs `check` from the source code (`bun run sentinel:check`) against the copy of the standard in `fixtures/standard/`, whose fingerprint is the one `forge614.node.json` pins. Sentinel accepts `sentinel.version` from 0.1.1 on; 0.1.0 rejects a pointer that carries it (`NODE_POINTER_INVALID`) because its schema is strict. A node therefore adds the field only when it pins 0.1.1 or later.
 
 ## Exit codes and errors
 
