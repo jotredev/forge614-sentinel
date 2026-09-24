@@ -3,6 +3,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { writeFakeRelease } from "../../../tests/helpers/fake-release";
 import { run } from "../../infrastructure/process";
 import { CheckReportSchema } from "../../modules/report";
 
@@ -80,4 +81,24 @@ test("a crashing check prints the report (verdict fail) on stdout AND a CHECK_FA
   expect(report.verdict).toBe("fail");
   expect(report.checks.find((c) => c.id === "layout")?.evidence).toEqual(["CHECK_FAILED: injected crash"]);
   expect(JSON.parse(r.stderr.trim())).toMatchObject({ schemaVersion: 1, code: "CHECK_FAILED" });
+});
+
+test("--standard with a newer standard that requests an unknown validator: caution exits 0, --strict exits 1, report is marked forced", () => {
+  // A fake 1.0.1 release built from the 1.0.0 fixture (tests/helpers/fake-release.ts)
+  // whose thin-workflows manifest asks for a validator Sentinel does not have.
+  const release = writeFakeRelease("1.0.1", (members) =>
+    members.map((m) => (m.path === "rules/forge614-rule-thin-workflows/manifest.json" ? { ...m, content: new TextEncoder().encode(new TextDecoder().decode(m.content).replace('"validator": "workflows"', '"validator": "boundaries-zod"')) } : m)),
+  );
+  const home = mkdtempSync(join(tmpdir(), "sentinel-cli-strict-"));
+  const soft = cli(["--repo", join(FIXTURES, "pass-node"), "--standard", "1.0.1", "--json"], { FORGE614_HOME: home, FORGE614_SENTINEL_RELEASE_BASE: release.base });
+  expect(soft.exitCode, soft.stderr).toBe(0);
+  const report = CheckReportSchema.parse(JSON.parse(soft.stdout.trim()));
+  expect(report.verdict).toBe("caution");
+  expect(report.standard).toMatchObject({ version: "1.0.1", sha256: release.sha256, forced: true });
+  expect(report.checks.find((c) => c.id === "node-pointer")?.verdict).toBe("caution");
+  // installer renders STANDARD_VERSION from the pointer (1.0.0), not from the forced 1.0.1.
+  expect(report.checks.find((c) => c.id === "installer")?.verdict).toBe("pass");
+  expect(report.checks.find((c) => c.id === "boundaries-zod")?.evidence[0]).toStartWith("SENTINEL_OUTDATED:");
+  const strict = cli(["--repo", join(FIXTURES, "pass-node"), "--standard", "1.0.1", "--strict", "--json"], { FORGE614_HOME: home, FORGE614_SENTINEL_RELEASE_BASE: release.base });
+  expect(strict.exitCode).toBe(1);
 });
