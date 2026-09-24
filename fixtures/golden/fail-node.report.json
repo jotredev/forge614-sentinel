@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "sentinel": "0.1.0",
+  "standard": {
+    "version": "1.0.0",
+    "sha256": "18d4455f6277374bf68938975cb1406f762f4ca9462b692f79bd01152b370922",
+    "forced": false,
+    "fetched": true
+  },
+  "repository": {
+    "kind": "node",
+    "name": "demo"
+  },
+  "verdict": "fail",
+  "checks": [
+    {
+      "id": "node-pointer",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "forge614.node.json válido y con la huella del reglamento en caché.",
+        "en": "forge614.node.json is valid and carries the cached standard's fingerprint."
+      }
+    },
+    {
+      "id": "layout",
+      "verdict": "fail",
+      "applied": true,
+      "evidence": [
+        "layout list source: builtin (standard 1.0.0 ships no layout.json)",
+        "missing file .githooks/pre-push"
+      ],
+      "message": {
+        "es": "Faltan carpetas o archivos obligatorios de STANDARD §2.",
+        "en": "Mandatory folders or files of STANDARD §2 are missing."
+      }
+    },
+    {
+      "id": "stack",
+      "verdict": "fail",
+      "applied": true,
+      "evidence": [
+        "stack rules source: builtin (standard 1.0.0 ships no stack.json)",
+        "src/app/bad.ts:1: any"
+      ],
+      "message": {
+        "es": "Stack fuera de STANDARD §3.",
+        "en": "Stack violates STANDARD §3."
+      }
+    },
+    {
+      "id": "secrets-hygiene",
+      "verdict": "fail",
+      "applied": true,
+      "evidence": [
+        "secret patterns source: builtin (standard 1.0.0 ships no secret-patterns.json)",
+        "src/config.ts:1: aws-access-key-id"
+      ],
+      "message": {
+        "es": "Posibles secretos en el árbol.",
+        "en": "Possible secrets in the tree."
+      }
+    },
+    {
+      "id": "package-naming",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Nombres de paquetes canónicos.",
+        "en": "Package names are canonical."
+      }
+    },
+    {
+      "id": "forbidden-mentions",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Sin menciones prohibidas.",
+        "en": "No forbidden mentions."
+      }
+    },
+    {
+      "id": "docs-parity",
+      "verdict": "fail",
+      "applied": true,
+      "evidence": [
+        "docs/es/00-resumen.md: missing docs/en/00-*.md"
+      ],
+      "message": {
+        "es": "Falta paridad español/inglés en documentación.",
+        "en": "Spanish/English documentation parity is broken."
+      }
+    },
+    {
+      "id": "decisions",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Actas de decisión coherentes.",
+        "en": "Decision records are consistent."
+      }
+    },
+    {
+      "id": "agent-checklist-impact",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Planes cerrados declaran impacto en el procedimiento de agentes.",
+        "en": "Completed plans declare agent-procedure impact."
+      }
+    },
+    {
+      "id": "error-codes",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Códigos de error con formato canónico.",
+        "en": "Error codes use the canonical format."
+      }
+    },
+    {
+      "id": "node-contract",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "CONTRACT.md coherente con package.json y con los códigos de la CLI.",
+        "en": "CONTRACT.md is consistent with package.json and with the CLI error codes."
+      }
+    },
+    {
+      "id": "installer",
+      "verdict": "fail",
+      "applied": true,
+      "evidence": [
+        "install.sh:4: expected 'set -euo pipefail' got 'set -eu'"
+      ],
+      "message": {
+        "es": "Instaladores distintos de la plantilla del reglamento.",
+        "en": "Installers differ from the standard's template."
+      }
+    },
+    {
+      "id": "release",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Workflows de verificación y release conformes a la plantilla; CHANGELOG presente.",
+        "en": "Verify and release workflows follow the template; CHANGELOG present."
+      }
+    },
+    {
+      "id": "versions",
+      "verdict": "fail",
+      "applied": true,
+      "evidence": [
+        "git tags not available (not a git checkout)",
+        "package.json version 0.2.0 vs docs/notion-map.json productVersion 0.1.0"
+      ],
+      "message": {
+        "es": "Versiones incoherentes entre package.json, tags o docs/notion-map.json.",
+        "en": "Versions are inconsistent across package.json, tags or docs/notion-map.json."
+      }
+    },
+    {
+      "id": "workflows",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Workflows delgados, fijados y documentados.",
+        "en": "Workflows are thin, pinned and documented."
+      }
+    },
+    {
+      "id": "support-matrix",
+      "verdict": "not-applicable",
+      "applied": false,
+      "evidence": [],
+      "message": {
+        "es": "No aplica: standard/support-matrix.json not present.",
+        "en": "Not applicable: standard/support-matrix.json not present."
+      }
+    },
+    {
+      "id": "context-budget",
+      "verdict": "not-applicable",
+      "applied": false,
+      "evidence": [],
+      "message": {
+        "es": "No aplica: standard/packs/forge614-pack-ecosystem-node/pack.json not present.",
+        "en": "Not applicable: standard/packs/forge614-pack-ecosystem-node/pack.json not present."
+      }
+    },
+    {
+      "id": "ecosystem-contract",
+      "verdict": "pass",
+      "applied": true,
+      "evidence": [],
+      "message": {
+        "es": "Contrato del ecosistema coherente.",
+        "en": "Ecosystem contract is consistent."
+      }
+    },
+    {
+      "id": "rules-catalog",
+      "verdict": "not-applicable",
+      "applied": false,
+      "evidence": [],
+      "message": {
+        "es": "No aplica: no standard/rules or standard/packs in this repository.",
+        "en": "Not applicable: no standard/rules or standard/packs in this repository."
+      }
+    }
+  ]
+}

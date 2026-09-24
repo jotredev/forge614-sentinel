@@ -6,6 +6,7 @@
 | Job | Disparador | Qué ejecuta | Qué valida | Duración esperada |
 | --- | --- | --- | --- | --- |
 | `verify` | push a `main`, pull request | `bun install --frozen-lockfile`, `bun run verify` | typecheck, tests, validadores del estándar, workflows | ~3 min |
+| `parity` | push a `main`, pull request | `bun install --frozen-lockfile`, `bun run sentinel:parity` en `ubuntu-24.04`, `macos-15` y `windows-2025` | que el informe de `check` sobre `fixtures/pass-node` y `fixtures/fail-node` (sin `durationMs`) sea byte a byte el de `fixtures/golden/` en los tres sistemas | ~2 min por sistema |
 
 ## `release.yml`
 | Job | Disparador | Qué ejecuta | Qué publica | Duración esperada |
@@ -13,7 +14,7 @@
 | `build` | tag `v*` | `bun run build:target`, `bun run smoke:target` en macOS arm64/x64, Linux arm64/x64, Windows x64 | artefactos por plataforma | ~8 min |
 | `publish` | tras `build` | `bun run release:publish` | release con binarios y `SHA256SUMS` | ~1 min |
 
-Todo job declara `timeout-minutes` (`verify`: 10; `build`: 20; `publish`: 10): ninguna etapa queda sin límite y `bun run workflows:check` rechaza el job que no lo lleva.
+Todo job declara `timeout-minutes` (`verify`: 10; `parity`: 15; `build`: 20; `publish`: 10): ninguna etapa queda sin límite y `bun run workflows:check` rechaza el job que no lo lleva.
 
 **Precondición de `release.yml`:** un nodo con dependencias `file:../` a repositorios hermanos en su `package.json` no puede adoptar esta plantilla; el workflow hace checkout de un solo repositorio y `bun install --frozen-lockfile` fallaría contra esa dependencia de ruta. Se sustituye por la versión publicada del nodo hermano antes de adoptar la plantilla.
 
