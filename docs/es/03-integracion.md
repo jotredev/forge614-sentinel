@@ -4,7 +4,7 @@
 
 ## Instalar, actualizar y desinstalar
 
-En macOS y Linux se instala con `curl -fsSL https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.sh | bash`; en Windows PowerShell, con `irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex`. Se requiere Node.js 22.19.0 o posterior. `forge614-sentinel update` y `forge614-sentinel uninstall` usan el portero de la release más reciente; `forge614-sentinel uninstall --self` responde sin cambios porque Sentinel no integra asistentes.
+En macOS y Linux se instala con `curl -fsSL https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.sh | bash`; en Windows PowerShell, con `irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex`. Se requiere Node.js 22.19.0 o posterior para actualizar y desinstalar. `forge614-sentinel update` verifica y ejecuta el portero de la release destino: la última por defecto, o la versión indicada con `--version X.Y.Z` (también acepta `vX.Y.Z`). `forge614-sentinel uninstall` usa el portero de la release más reciente. En una terminal pregunta `¿Desinstalar forge614-sentinel? [s/N]`; solo `s` o `y` confirma. Cualquier otra respuesta, Ctrl+C, Ctrl+D o fin de la entrada cancela con código `130`, sin desinstalar. `--json` y la ejecución sin terminal omiten la pregunta. `forge614-sentinel uninstall --self` nunca pregunta y responde sin cambios porque Sentinel no integra asistentes.
 
 ## En el verify de cada nodo
 
