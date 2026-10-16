@@ -187,12 +187,14 @@ function installationHome(env: Record<string, string | undefined>): string {
 }
 
 /** Resolve path aliases when possible, then compare Windows paths case-insensitively. */
-function sameWindowsPath(left: string, right: string): boolean {
+export function sameWindowsPath(left: string, right: string, resolvePath: (path: string) => string = (path) => realpathSync.native(path)): boolean {
   let resolvedLeft = left;
   let resolvedRight = right;
   try {
-    resolvedLeft = realpathSync.native(left);
-    resolvedRight = realpathSync.native(right);
+    const resolvedLeftPath = resolvePath(left);
+    const resolvedRightPath = resolvePath(right);
+    resolvedLeft = resolvedLeftPath;
+    resolvedRight = resolvedRightPath;
   } catch { /* fall back to normalized paths when either path cannot be resolved */ }
   const normalizedLeft = win32.normalize(resolvedLeft).replaceAll("/", "\\").toLocaleLowerCase("en-US");
   const normalizedRight = win32.normalize(resolvedRight).replaceAll("/", "\\").toLocaleLowerCase("en-US");
