@@ -1,6 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync, type Dirent } from "node:fs";
 import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, win32 } from "node:path";
 import { runCommand } from "./run-command";
@@ -79,15 +79,38 @@ function testBaseUrl(env: Record<string, string | undefined>): string | undefine
   return url.origin;
 }
 
-/** Return the full URL of the platform's latest published gatekeeper. */
-function installerUrl(platform: string, base: string | undefined, versionTag?: string): string {
-  const file = platform === "win32" ? "install.ps1" : "install.sh";
-  const releasePath = versionTag === undefined
-    ? `releases/latest/download/${file}`
-    : `releases/download/${encodeURIComponent(versionTag)}/${file}`;
+/** Return the GitHub API URL used to select the latest stable release once. */
+function latestReleaseUrl(base: string | undefined): string {
+  return base === undefined
+    ? `https://api.github.com/repos/${REPOSITORY}/releases/latest`
+    : `${base}/repos/${REPOSITORY}/releases/latest`;
+}
+
+/** Return the asset URL for a specific release tag. */
+function releaseAssetUrl(base: string | undefined, tag: string, name: string): string {
+  const releasePath = `releases/download/${encodeURIComponent(tag)}/${name}`;
   return base === undefined
     ? `https://github.com/${REPOSITORY}/${releasePath}`
     : `${base}/repos/${REPOSITORY}/${releasePath}`;
+}
+
+/** Resolve the selected release tag before downloading any of its assets. */
+async function selectedReleaseTag(base: string | undefined, versionTag: string | undefined, fetcher: typeof fetch): Promise<string> {
+  if (versionTag !== undefined) return versionTag;
+  const response = await fetcher(latestReleaseUrl(base));
+  if (!response.ok) throw new Error("Could not resolve the latest Forge614 Sentinel release.");
+  let tag: unknown;
+  try { tag = (await response.json() as { tag_name?: unknown }).tag_name; } catch { tag = undefined; }
+  if (typeof tag !== "string" || !/^v?\d+\.\d+\.\d+$/.test(tag)) throw new Error("The latest Forge614 Sentinel release has an invalid tag.");
+  return tag.startsWith("v") ? tag : `v${tag}`;
+}
+
+/** Verify the selected gatekeeper bytes against the matching SHA256SUMS entry. */
+function verifyGatekeeperChecksum(file: string, bytes: Uint8Array, sums: string): void {
+  const entries = sums.split(/\r?\n/).map((line) => /^([a-fA-F0-9]{64})\s+\*?(.+?)\s*$/.exec(line)).filter((match) => match?.[2] === file);
+  if (entries.length !== 1 || entries[0]?.[1] === undefined) throw new InstallerActionError(`SHA256SUMS has no unique entry for ${file}.`, 1);
+  const actual = createHash("sha256").update(bytes).digest("hex");
+  if (actual !== entries[0][1].toLowerCase()) throw new InstallerActionError(`SHA-256 verification failed for ${file}.`, 1);
 }
 
 /** Resolve the installed Sentinel launcher path for the current operating system. */
@@ -165,12 +188,18 @@ export async function runInstallerGate(action: InstallerAction, options: Install
   const platform = options.platform ?? process.platform;
   const base = testBaseUrl(env);
   const file = platform === "win32" ? "install.ps1" : "install.sh";
-  const response = await (options.fetcher ?? fetch)(installerUrl(platform, base, action === "update" ? options.versionTag : undefined));
-  if (!response.ok) throw new Error("Could not download the Forge614 Sentinel installer.");
+  const fetcher = options.fetcher ?? fetch;
+  const tag = await selectedReleaseTag(base, action === "update" ? options.versionTag : undefined, fetcher);
+  const installerResponse = await fetcher(releaseAssetUrl(base, tag, file));
+  if (!installerResponse.ok) throw new Error("Could not download the Forge614 Sentinel installer.");
+  const installerBytes = new Uint8Array(await installerResponse.arrayBuffer());
+  const checksumResponse = await fetcher(releaseAssetUrl(base, tag, "SHA256SUMS"));
+  if (!checksumResponse.ok) throw new Error("Could not download the Forge614 Sentinel SHA256SUMS.");
+  verifyGatekeeperChecksum(file, installerBytes, await checksumResponse.text());
   const directory = mkdtempSync(join(tmpdir(), "forge614-sentinel-installer-"));
   const installer = join(directory, file);
   try {
-    writeFileSync(installer, new Uint8Array(await response.arrayBuffer()), { mode: 0o700 });
+    writeFileSync(installer, installerBytes, { mode: 0o700 });
     chmodSync(installer, 0o700);
     const processEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
     const flag = action === "update" ? (options.versionTag === undefined ? "--latest" : "--version") : "--uninstall";

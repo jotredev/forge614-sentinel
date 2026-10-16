@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { cleanupStaleWindowsLaunchers, runInstallerGate, updateSentinel, uninstallSentinel } from "./installer-actions";
@@ -7,14 +8,18 @@ import { updateMain } from "../interfaces/cli/update";
 import { uninstallMain } from "../interfaces/cli/uninstall";
 
 /** Run a test action against a loopback server and an isolated user home. */
-async function withGateServer<T>(action: (baseUrl: string, requests: string[], home: string) => Promise<T>, installerScript = "#!/bin/sh\nexit 0\n"): Promise<T> {
+async function withGateServer<T>(action: (baseUrl: string, requests: string[], home: string) => Promise<T>, installerScript = "#!/bin/sh\nexit 0\n", checksumContent?: string): Promise<T> {
   const requests: string[] = [];
+  const installerHash = createHash("sha256").update(installerScript).digest("hex");
+  const sums = checksumContent ?? `${installerHash}  install.sh\n${installerHash}  install.ps1\n`;
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
       const path = new URL(request.url).pathname;
       requests.push(path);
+      if (path.endsWith("/releases/latest")) return Response.json({ tag_name: "v0.2.1" });
+      if (path.endsWith("/SHA256SUMS")) return new Response(sums);
       return path.endsWith("/install.sh") || path.endsWith("/install.ps1") ? new Response(installerScript) : new Response("missing", { status: 404 });
     },
   });
@@ -25,6 +30,23 @@ async function withGateServer<T>(action: (baseUrl: string, requests: string[], h
     server.stop(true);
     rmSync(home, { recursive: true, force: true });
   }
+}
+
+/** Expected request sequence for a latest-release gate and its checksum. */
+function latestGateRequests(file: string): string[] {
+  return [
+    "/repos/jotredev/forge614-sentinel/releases/latest",
+    `/repos/jotredev/forge614-sentinel/releases/download/v0.2.1/${file}`,
+    "/repos/jotredev/forge614-sentinel/releases/download/v0.2.1/SHA256SUMS",
+  ];
+}
+
+/** Expected request sequence for a version-targeted gate and its checksum. */
+function taggedGateRequests(tag: string, file: string): string[] {
+  return [
+    `/repos/jotredev/forge614-sentinel/releases/download/${tag}/${file}`,
+    `/repos/jotredev/forge614-sentinel/releases/download/${tag}/SHA256SUMS`,
+  ];
 }
 
 test("update downloads the loopback gate and runs it with --latest in a temporary environment", async () => {
@@ -39,7 +61,7 @@ test("update downloads the loopback gate and runs it with --latest in a temporar
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     });
-    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.sh"]);
+    expect(requests).toEqual(latestGateRequests("install.sh"));
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe("bash");
     expect(calls[0]?.args[1]).toBe("--latest");
@@ -60,9 +82,35 @@ test("version-targeted update downloads the requested release and forwards --ver
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     } as Parameters<typeof runInstallerGate>[1]);
-    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/download/v0.2.0/install.sh"]);
+    expect(requests).toEqual(taggedGateRequests("v0.2.0", "install.sh"));
     expect(call?.args).toEqual([expect.any(String), "--version", "v0.2.0"]);
   });
+});
+
+/** A downloaded gatekeeper with a mismatched checksum is rejected before execution. */
+test("a gatekeeper checksum mismatch prevents execution and exits with code 1", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    let executed = false;
+    await expect(runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "darwin",
+      run: () => { executed = true; return { exitCode: 0, stdout: "", stderr: "" }; },
+    })).rejects.toMatchObject({ exitCode: 1 });
+    expect(executed).toBe(false);
+  }, "#!/bin/sh\nexit 0\n", `${"0".repeat(64)}  install.sh\n`);
+});
+
+/** A downloaded gatekeeper without a checksum entry is rejected before execution. */
+test("a missing gatekeeper checksum entry prevents execution and exits with code 1", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    let executed = false;
+    await expect(runInstallerGate("uninstall", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "darwin",
+      run: () => { executed = true; return { exitCode: 0, stdout: "", stderr: "" }; },
+    })).rejects.toMatchObject({ exitCode: 1 });
+    expect(executed).toBe(false);
+  }, "#!/bin/sh\nexit 0\n", `${"0".repeat(64)}  install.ps1\n`);
 });
 
 test("uninstall downloads the loopback gate and runs it with --uninstall", async () => {
@@ -76,7 +124,7 @@ test("uninstall downloads the loopback gate and runs it with --uninstall", async
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     });
-    expect(requests).toHaveLength(1);
+    expect(requests).toEqual(latestGateRequests("install.sh"));
     expect(args[1]).toBe("--uninstall");
     const update = await updateSentinel("0.2.1", {
       env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
@@ -93,7 +141,7 @@ test("uninstall downloads the loopback gate and runs it with --uninstall", async
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     });
-    expect(requests).toHaveLength(3);
+    expect(requests).toEqual([...latestGateRequests("install.sh"), ...latestGateRequests("install.sh"), ...latestGateRequests("install.sh")]);
   });
 });
 
@@ -108,7 +156,7 @@ test("Windows selects the PowerShell gatekeeper and forwards --latest", async ()
         return { exitCode: 0, stdout: "", stderr: "" };
       },
     });
-    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.ps1"]);
+    expect(requests).toEqual(latestGateRequests("install.ps1"));
     expect(call?.command).toBe("powershell.exe");
     expect(call?.args).toEqual(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", expect.any(String), "--latest"]);
   });
@@ -233,7 +281,7 @@ test("update --json reports the result after invoking the local published gate",
     expect(code, stderr.join("\n")).toBe(0);
     expect(stderr).toEqual([]);
     expect(JSON.parse(stdout[0] ?? "")).toEqual({ schemaVersion: 1, updated: false, previousVersion: "0.2.1", installedVersion: "0.2.1" });
-    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.sh"]);
+    expect(requests).toEqual(latestGateRequests("install.sh"));
   });
 });
 
@@ -254,7 +302,7 @@ test("update --version X.Y.Z downloads that release and returns JSON", async () 
     expect(code, stderr.join("\n")).toBe(0);
     expect(stderr).toEqual([]);
     expect(JSON.parse(stdout[0] ?? "")).toMatchObject({ schemaVersion: 1, updated: false, previousVersion: "0.2.1" });
-    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/download/v0.2.0/install.sh"]);
+    expect(requests).toEqual(taggedGateRequests("v0.2.0", "install.sh"));
   });
 });
 
@@ -306,7 +354,7 @@ test("uninstall --json reports removal after invoking the local published gate",
     expect(code).toBe(0);
     expect(stderr).toEqual([]);
     expect(JSON.parse(stdout[0] ?? "")).toEqual({ schemaVersion: 1, result: { removed: true } });
-    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.sh"]);
+    expect(requests).toEqual(latestGateRequests("install.sh"));
   });
 });
 
