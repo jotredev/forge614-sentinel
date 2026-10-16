@@ -33,3 +33,9 @@ test("a forced run whose declared version IS cached still cross-checks it and no
   expect(r.verdict).toBe("pass");
   expect(r.evidence).toEqual(["checked against standard 1.1.0 (--standard); forge614.node.json declares 1.0.0"]);
 });
+
+test("fails when standard/VERSION differs from the node pointer", () => {
+  const r = nodePointerCheck.run(snapshotFrom({ "standard/VERSION": "1.1.0\n" }), testParams({ pointer: { ...DEMO_POINTER, node: "ai" } }));
+  expect(r.verdict).toBe("fail");
+  expect(r.evidence).toContain("standard/VERSION 1.1.0 vs forge614.node.json 1.0.0");
+});

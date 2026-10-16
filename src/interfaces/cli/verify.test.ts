@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { run } from "../../infrastructure/process";
 
 const CLI = resolve(import.meta.dir, "verify.ts");
@@ -17,13 +18,13 @@ test("--help and an unknown flag", () => {
 // the empty template; the test that also demands exit 0 and verdict pass
 // arrives together with the filled-in contract.
 test("--skip-tests runs typecheck, workflows:check and notion-map:build --check green, then sentinel:check", () => {
-  const r = run(["bun", "run", CLI, "--skip-tests"], { cwd: REPO_ROOT, timeoutMs: 300_000 });
+  const r = run(["bun", "run", CLI, "--skip-tests"], { cwd: REPO_ROOT, timeoutMs: 300_000, env: { GIT_DIR: join(tmpdir(), "sentinel-no-git-dir") } });
   for (const label of ["typecheck", "workflows:check", "notion-map:build --check"]) expect(r.stderr).toContain(`[verify] ${label}: exit 0`);
   expect(r.stderr).toContain("[verify] sentinel:check: exit ");
 });
 
 test("--skip-tests exits 0 with one JSON: every step green and the self-check verdict pass", () => {
-  const r = run(["bun", "run", CLI, "--skip-tests"], { cwd: REPO_ROOT, timeoutMs: 300_000 });
+  const r = run(["bun", "run", CLI, "--skip-tests"], { cwd: REPO_ROOT, timeoutMs: 300_000, env: { GIT_DIR: join(tmpdir(), "sentinel-no-git-dir") } });
   expect(r.exitCode, r.stderr).toBe(0);
   const out = JSON.parse(r.stdout.trim());
   expect(out).toMatchObject({ schemaVersion: 1, ok: true });

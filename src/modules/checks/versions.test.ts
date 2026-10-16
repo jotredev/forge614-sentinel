@@ -38,6 +38,12 @@ test("a git checkout without v* tags (a shallow CI clone) compares package.json 
   expect(r.evidence).toEqual([]);
 });
 
+test("in new-template mode rejects tags that look like versions but omit v", () => {
+  const r = versionsCheck.run(snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["0.1.0", "standard-v1.2.0"] }), testParams({ templates: new Map([["install.mjs", "template"]]) }));
+  expect(r.verdict).toBe("fail");
+  expect(r.evidence).toContain("git tag '0.1.0' looks like a version but must start with v");
+});
+
 test("missing or invalid version fields are evidence", () => {
   const r = versionsCheck.run(snapshotFrom({ "package.json": JSON.stringify({ version: "1.0" }) }), params);
   expect(r.evidence).toEqual(expect.arrayContaining(["package.json: version '1.0' is not X.Y.Z", "docs/notion-map.json missing"]));

@@ -39,3 +39,19 @@ test("an extra job outside the allowed list is a fail naming it", () => {
   expect(r.verdict).toBe("fail");
   expect(r.evidence).toContain("verify.yml: extra job 'deploy' is not in the allowed list (parity)");
 });
+
+test("forge614-ai does not require release.yml", () => {
+  const r = releaseCheck.run(snapshotFromDir("forge614-ai"), testParams({ pointer: { ...testParams().pointer, node: "ai" }, templates: params.templates }));
+  expect(r.verdict).toBe("pass");
+  expect(r.evidence).toEqual([]);
+});
+
+test("forge614-ai verify allows checkout tag settings and one pinned setup-node step", () => {
+  const expected = params.parseYaml(verifyTemplate) as { jobs: { verify: { steps: Record<string, unknown>[] } } };
+  const actual = structuredClone(expected);
+  actual.jobs.verify.steps[0] = { ...actual.jobs.verify.steps[0], with: { "fetch-depth": 0, "fetch-tags": true } };
+  actual.jobs.verify.steps.splice(2, 0, { uses: `actions/setup-node@${"a".repeat(40)}`, with: { "node-version": "22.19.0" } });
+  const r = releaseCheck.run(snapshotFrom({ ".github/workflows/verify.yml": JSON.stringify(actual), ".github/workflows/release.yml": releaseTemplate, "CHANGELOG.md": "# Changelog\n" }), testParams({ pointer: { ...testParams().pointer, node: "ai" }, templates: params.templates }));
+  expect(r.verdict).toBe("pass");
+  expect(r.evidence).toEqual([]);
+});

@@ -20,11 +20,11 @@ function readJson<T>(schema: z.ZodType<T>, raw: string): T | null {
 // A shallow CI clone (actions/checkout fetch-depth 1) carries no tags, so
 // pull requests compare package.json with notion-map only; the release
 // workflow runs on the pushed tag, which must then equal package.json.
-// `--version` is not executed in 0.1 (machine-contracts, 0.2).
+// `--version` is not executed in 0.2 (machine-contracts, 0.3).
 export const versionsCheck: CheckDefinition = {
   id: "versions",
   appliesWhen: (snapshot) => has(snapshot, "package.json"),
-  run: (snapshot) => {
+  run: (snapshot, params) => {
     const evidence: string[] = [];
     let problems = 0;
     const flag = (line: string): void => {
@@ -39,6 +39,9 @@ export const versionsCheck: CheckDefinition = {
     else if (!SEMVER_PATTERN.test(pkgVersion)) flag(`package.json: version '${pkgVersion}' is not X.Y.Z`);
 
     if (!snapshot.facts.gitAvailable) evidence.push("git tags not available (not a git checkout)");
+    if (params.templates.has("install.mjs")) {
+      for (const tag of snapshot.facts.gitTags) if (/^\d+\.\d+\.\d+$/.test(tag)) flag(`git tag '${tag}' looks like a version but must start with v`);
+    }
     const highestTag = highestSemver(snapshot.facts.gitTags.filter((t) => /^v\d+\.\d+\.\d+$/.test(t)).map((t) => t.slice(1)));
     if (highestTag !== undefined && pkgVersion !== undefined && SEMVER_PATTERN.test(pkgVersion) && pkgVersion !== highestTag) {
       flag(`package.json version ${pkgVersion} vs highest tag v${highestTag}`);

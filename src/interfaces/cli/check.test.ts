@@ -74,6 +74,13 @@ test("an invalid pointer is NODE_POINTER_INVALID with exit 2", async () => {
   expect(JSON.parse(r.stderr.trim())).toMatchObject({ code: "NODE_POINTER_INVALID" });
 });
 
+test("a Forge614 ecosystem project without a pointer prints NODE_POINTER_MISSING with exit 1", () => {
+  const r = cli(["--repo", join(FIXTURES, "forge614-no-pointer"), "--json"]);
+  expect(r.exitCode).toBe(1);
+  expect(r.stdout).toBe("");
+  expect(JSON.parse(r.stderr.trim())).toMatchObject({ schemaVersion: 1, code: "NODE_POINTER_MISSING" });
+});
+
 test("a crashing check prints the report (verdict fail) on stdout AND a CHECK_FAILED envelope on stderr, exit 1", () => {
   const r = cli(["--repo", join(FIXTURES, "pass-node"), "--json"], { FORGE614_SENTINEL_CRASH_CHECK: "layout" });
   expect(r.exitCode).toBe(1);

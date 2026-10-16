@@ -4,6 +4,7 @@ import { NodePointerSchema, type NodePointer } from "../modules/schemas/node-poi
 
 export type Classification =
   | { kind: "node"; pointer: NodePointer }
+  | { kind: "missing-pointer" }
   | { kind: "external-project" }
   | { kind: "not-a-forge614-repo" }
   | { kind: "invalid-pointer"; error: string };
@@ -28,6 +29,15 @@ export function classifyRepository(root: string): Classification {
     if (!parsed.success) return { kind: "invalid-pointer", error: `forge614.node.json does not match NodePointerSchema: ${issuesOf(parsed.error)}` };
     return { kind: "node", pointer: parsed.data };
   }
-  if (existsSync(join(root, ".forge614", "project.json"))) return { kind: "external-project" };
+  const projectPath = join(root, ".forge614", "project.json");
+  if (existsSync(projectPath)) {
+    try {
+      const project = JSON.parse(readFileSync(projectPath, "utf8")) as { ecosystem?: { name?: unknown } };
+      if (project.ecosystem?.name === "forge614") return { kind: "missing-pointer" };
+    } catch {
+      // An unreadable or malformed third-party project file is not a node identity.
+    }
+    return { kind: "external-project" };
+  }
   return { kind: "not-a-forge614-repo" };
 }

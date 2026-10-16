@@ -2,6 +2,20 @@ import { describe, expect, test } from "bun:test";
 import { NodePointerSchema } from "./node-pointer";
 
 const valid = { schemaVersion: 1, node: "engram", kind: "product", standard: { version: "1.0.0", sha256: "a".repeat(64) } } as const;
+const validInstall = {
+  repository: "jotredev/forge614-engram",
+  minimumNodeVersion: "22.19.0",
+  systems: [
+    { os: "darwin", architectures: ["arm64", "x64"] },
+    { os: "linux", architectures: ["arm64", "x64"] },
+    { os: "windows", architectures: ["x64"] },
+  ],
+  tagFormat: "vX.Y.Z",
+  asset: { type: "binary-tar-gzip-or-zip", pattern: "forge614-engram-<plat>-<arch>.tar.gz|.zip", checksumFile: "SHA256SUMS" },
+  dependencies: [],
+  path: { modify: false, retireWhen: null },
+  smokeTest: ["--version"],
+} as const;
 
 describe("forge614.node.json", () => {
   test("valid", () => expect(NodePointerSchema.parse(valid)).toEqual(valid));
@@ -34,5 +48,9 @@ describe("forge614.node.json", () => {
     expect(NodePointerSchema.safeParse({ ...valid, sentinel: {} }).success).toBe(false);
     expect(NodePointerSchema.safeParse({ ...valid, sentinel: "0.1.1" }).success).toBe(false);
     expect(NodePointerSchema.safeParse({ ...valid, sentinel: { version: "0.1.1", sha256: "a".repeat(64) } }).success).toBe(false);
+  });
+  test("accepts the standard 1.2.x install block and rejects unknown fields", () => {
+    expect(NodePointerSchema.safeParse({ ...valid, install: validInstall }).success).toBe(true);
+    expect(NodePointerSchema.safeParse({ ...valid, install: { ...validInstall, unexpected: true } }).success).toBe(false);
   });
 });

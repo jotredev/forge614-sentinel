@@ -3,6 +3,7 @@ import { testParams } from "../../../tests/helpers/params";
 import { snapshotFromDir } from "../../../tests/helpers/snapshot-from-dir";
 import { snapshotFrom } from "../snapshot";
 import { workflowsCheck } from "./workflows";
+import { checkWorkflowShape } from "../workflow";
 
 const params = testParams();
 const yml = `name: verify\non:\n  pull_request: {}\njobs:\n  verify:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n    steps:\n      - uses: actions/checkout@34e114876b0b11a390a9f2f37d3e4bb0e8a0a8bb\n      - run: bun run verify\n`;
@@ -29,4 +30,9 @@ test("no workflows found is a pass with workflowsNone", () => {
   const r = workflowsCheck.run(snapshotFrom({}), params);
   expect(r.verdict).toBe("pass");
   expect(r.messageKey).toBe("workflowsNone");
+});
+
+test("accepts the new release asset preparation command", () => {
+  const workflow = params.parseYaml(`name: release\non:\n  push: {}\njobs:\n  publish:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 10\n    steps:\n      - run: bun run scripts/prepare-release-assets.mjs\n`);
+  expect(checkWorkflowShape(workflow as never, "release.yml")).toEqual([]);
 });

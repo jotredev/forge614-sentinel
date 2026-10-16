@@ -10,6 +10,7 @@ export const DEMO_POINTER = { schemaVersion: 1 as const, node: "demo", kind: "pr
 const MINIMAL_PACK: Pack = { schemaVersion: 1, name: "forge614-pack-ecosystem-node", version: "1.0.0", title: { es: "t", en: "t" }, rules: ["forge614-rule-package-naming"] };
 
 export function testParams(overrides: Partial<CheckParams> = {}): CheckParams {
+  const templates = overrides.templates ?? new Map<string, string>();
   return {
     sentinelVersion: "0.1.0",
     today: "2026-09-22",
@@ -18,7 +19,8 @@ export function testParams(overrides: Partial<CheckParams> = {}): CheckParams {
     pack: MINIMAL_PACK,
     manifests: new Map(),
     forbiddenMentions: { terms: [], excludePaths: [] },
-    templates: new Map(),
+    templates,
+    rawTemplates: new Map([...templates].map(([path, text]) => [path, new TextEncoder().encode(text)])),
     ecosystemContract: "",
     layout: BUILTIN_LAYOUT,
     stack: BUILTIN_STACK,

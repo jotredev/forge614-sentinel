@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { classifyRepository } from "./classify-repository";
 
 const SHA = "18d4455f6277374bf68938975cb1406f762f4ca9462b692f79bd01152b370922";
@@ -21,6 +21,18 @@ test(".forge614/project.json without a pointer is an external project", () => {
   const root = folder();
   mkdirSync(join(root, ".forge614"));
   writeFileSync(join(root, ".forge614/project.json"), "{}");
+  expect(classifyRepository(root)).toEqual({ kind: "external-project" });
+});
+
+test("a forge614 ecosystem project without a node pointer is a dedicated error", () => {
+  const root = resolve(import.meta.dir, "../../fixtures/forge614-no-pointer");
+  expect(classifyRepository(root)).toEqual({ kind: "missing-pointer" });
+});
+
+test("a third-party project with a project file remains external", () => {
+  const root = folder();
+  mkdirSync(join(root, ".forge614"));
+  writeFileSync(join(root, ".forge614/project.json"), JSON.stringify({ ecosystem: { name: "other" } }));
   expect(classifyRepository(root)).toEqual({ kind: "external-project" });
 });
 

@@ -85,3 +85,9 @@ test("an invalid pointer is NODE_POINTER_INVALID", async () => {
   await Bun.write(join(root, "forge614.node.json"), "{ \"schemaVersion\": 2 }");
   expect(await checkRepository({ ...base(), root })).toMatchObject({ kind: "error", code: "NODE_POINTER_INVALID" });
 });
+
+test("a forge614 ecosystem repository without forge614.node.json is NODE_POINTER_MISSING", async () => {
+  const root = mkdtempSync(join(tmpdir(), "sentinel-noptr-"));
+  await Bun.write(join(root, ".forge614/project.json"), JSON.stringify({ ecosystem: { name: "forge614" } }));
+  expect(await checkRepository({ ...base(), root })).toMatchObject({ kind: "error", code: "NODE_POINTER_MISSING" });
+});

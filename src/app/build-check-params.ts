@@ -26,14 +26,15 @@ export const BUILTIN_STACK: StackSpec = {
 
 export const BUILTIN_SECRETS: SecretsSpec = {
   patterns: [
-    { id: "private-key", pattern: "-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----" },
+    { id: "private-key", pattern: "^\\s*[\\\"']?-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY-----" },
     { id: "aws-access-key-id", pattern: "\\bAKIA[0-9A-Z]{16}\\b" },
     { id: "github-token", pattern: "\\bgh[pousr]_[A-Za-z0-9]{36,}\\b" },
     { id: "github-fine-grained-token", pattern: "\\bgithub_pat_[A-Za-z0-9_]{22,}\\b" },
     { id: "slack-token", pattern: "\\bxox[baprs]-[A-Za-z0-9-]{10,}\\b" },
-    { id: "connection-string-with-credentials", pattern: "\\b[a-z][a-z0-9+.-]*://[^\\s/:@]+:[^\\s/@]+@" },
+    { id: "connection-string-with-credentials", pattern: "\\b[a-z][a-z0-9+.-]*://[^\\s/:@]+:[^\\s/@]+@[^\\s/:]+(?::\\d+)?" },
   ],
   excludePaths: ["fixtures/"],
+  allowedMarkers: ["EXAMPLE", "user:secret", "user:pass", "localhost", "127.0.0.1"],
   source: "builtin",
 };
 
@@ -53,7 +54,7 @@ export const LEGACY_VALIDATOR_IDS: Readonly<Record<string, string>> = {
 const LayoutFileSchema = z.object({ schemaVersion: z.literal(1), directories: z.array(z.string().min(1)), files: z.array(z.string().min(1)) }).strict();
 const StackFileSchema = z.object({ schemaVersion: z.literal(1), tsconfigFlags: z.array(z.string().min(1)).min(1), minimumBun: z.string().regex(/^\d+\.\d+\.\d+$/) }).strict();
 const SecretsFileSchema = z
-  .object({ schemaVersion: z.literal(1), patterns: z.array(z.object({ id: z.string().min(1), pattern: z.string().min(1) }).strict()).min(1), excludePaths: z.array(z.string()) })
+  .object({ schemaVersion: z.literal(1), patterns: z.array(z.object({ id: z.string().min(1), pattern: z.string().min(1) }).strict()).min(1), excludePaths: z.array(z.string()), allowedMarkers: z.array(z.string()).optional() })
   .strict();
 
 export type BuildParamsResult = { ok: true; params: CheckParams } | { ok: false; code: "STANDARD_CORRUPT"; error: string };
@@ -105,6 +106,8 @@ export function buildCheckParams(options: BuildCheckParamsOptions): BuildParamsR
 
   const templates = new Map<string, string>();
   for (const [path, text] of files) if (path.startsWith("templates/")) templates.set(path.slice("templates/".length), text);
+  const rawTemplates = new Map<string, Uint8Array>();
+  for (const [path, bytes] of options.standard.rawFiles) if (path.startsWith("templates/")) rawTemplates.set(path.slice("templates/".length), bytes);
   if (templates.size === 0) return corrupt(version, "templates/ missing");
 
   const ecosystemContract = files.get("FORGE614_ECOSYSTEM_CONTRACT.md");
@@ -126,7 +129,7 @@ export function buildCheckParams(options: BuildCheckParamsOptions): BuildParamsR
   if (files.has("secret-patterns.json")) {
     const parsed = parseJson(SecretsFileSchema, files.get("secret-patterns.json"), "secret-patterns.json", version);
     if (!parsed.ok) return parsed.result;
-    secrets = { patterns: parsed.value.patterns, excludePaths: parsed.value.excludePaths, source: "standard/secret-patterns.json" };
+    secrets = { patterns: parsed.value.patterns, excludePaths: parsed.value.excludePaths, allowedMarkers: [...BUILTIN_SECRETS.allowedMarkers, ...(parsed.value.allowedMarkers ?? [])], source: "standard/secret-patterns.json" };
   }
 
   return {
@@ -140,6 +143,7 @@ export function buildCheckParams(options: BuildCheckParamsOptions): BuildParamsR
       manifests,
       forbiddenMentions: { terms: forbidden.value.terms, excludePaths: forbidden.value.excludePaths },
       templates,
+      rawTemplates,
       ecosystemContract,
       layout,
       stack,

@@ -37,3 +37,9 @@ test("when the standard ships layout.json the evidence names it instead", () => 
   expect(r.verdict).toBe("pass");
   expect(r.evidence).toEqual(["layout list source: standard/layout.json"]);
 });
+
+test("allows prepare-release-assets.mjs in scripts when the new template is active", () => {
+  const p = testParams({ templates: new Map([["prepare-release-assets.mjs", "template"], ["install.mjs", "template"]]), layout: { directories: ["src"], files: ["README.md"], source: "standard/layout.json" } });
+  const r = layoutCheck.run(snapshotFrom({ "src/a.ts": "", "README.md": "", "scripts/prepare-release-assets.mjs": "local copy" }), p);
+  expect(r.verdict).toBe("pass");
+});

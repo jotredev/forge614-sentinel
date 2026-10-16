@@ -26,7 +26,7 @@ export interface CheckRepositoryOptions {
 export type CheckRepositoryResult =
   | { kind: "report"; report: CheckReport; crashed: string[] }
   | { kind: "not-applicable"; report: NotApplicableReport }
-  | { kind: "error"; code: "NODE_POINTER_INVALID" | "STANDARD_UNAVAILABLE" | "STANDARD_CORRUPT" | "STANDARD_FETCH_FAILED"; error: string };
+  | { kind: "error"; code: "NODE_POINTER_MISSING" | "NODE_POINTER_INVALID" | "STANDARD_UNAVAILABLE" | "STANDARD_CORRUPT" | "STANDARD_FETCH_FAILED"; error: string };
 
 // The whole use case, in the order the spec fixes: identity (§4), standard
 // resolution and cache (§5), one snapshot, the checks (§8), the report
@@ -36,6 +36,7 @@ export async function checkRepository(options: CheckRepositoryOptions): Promise<
   const started = clock();
 
   const classification = classifyRepository(options.root);
+  if (classification.kind === "missing-pointer") return { kind: "error", code: "NODE_POINTER_MISSING", error: "repository declares ecosystem.name 'forge614' but forge614.node.json is missing" };
   if (classification.kind === "invalid-pointer") return { kind: "error", code: "NODE_POINTER_INVALID", error: classification.error };
   if (classification.kind !== "node") return { kind: "not-applicable", report: { schemaVersion: 1, applicable: false, reason: classification.kind } };
   const { pointer } = classification;

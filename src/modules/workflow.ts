@@ -37,7 +37,7 @@ const Job = z
 export const WorkflowSchema = z.object({ name: z.string().min(1), on: z.record(z.string(), z.unknown()), jobs: z.record(z.string(), Job) }).strict();
 export type Workflow = z.infer<typeof WorkflowSchema>;
 
-export const ALLOWED_RUN = /^(bun install --frozen-lockfile|bun test|bun run [a-z0-9:.-]+)$/;
+export const ALLOWED_RUN = /^(bun install --frozen-lockfile|bun test|bun run [a-z0-9:.-]+|bun run scripts\/prepare-release-assets\.mjs)$/;
 export const PINNED_USES = /^[\w.-]+\/[\w.-]+@[0-9a-f]{40}(\s+#.*)?$/;
 
 export function checkWorkflowShape(w: Workflow, id: string): string[] {
