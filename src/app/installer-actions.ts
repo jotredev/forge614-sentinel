@@ -155,12 +155,18 @@ async function selectedReleaseTag(base: string | undefined, versionTag: string |
   return tag.startsWith("v") ? tag : `v${tag}`;
 }
 
-/** Verify the selected gatekeeper bytes against the matching SHA256SUMS entry. */
+/** Verify the selected gatekeeper bytes against one strict GNU SHA256SUMS entry. */
 function verifyGatekeeperChecksum(file: string, bytes: Uint8Array, sums: string): void {
-  const entries = sums.split(/\r?\n/).map((line) => /^([a-fA-F0-9]{64})\s+\*?(.+?)\s*$/.exec(line)).filter((match) => match?.[2] === file);
+  const lines = sums.split(/\r?\n/);
+  if (lines.at(-1) === "") lines.pop();
+  const parsed = lines.map((line) => /^([0-9a-f]{64})  (.+)$/.exec(line));
+  if (parsed.length === 0 || parsed.some((match) => match === null)) {
+    throw new InstallerActionError("SHA256SUMS does not use strict GNU SHA-256 format.", 1);
+  }
+  const entries = parsed.filter((match) => match?.[2] === file);
   if (entries.length !== 1 || entries[0]?.[1] === undefined) throw new InstallerActionError(`SHA256SUMS has no unique entry for ${file}.`, 1);
   const actual = createHash("sha256").update(bytes).digest("hex");
-  if (actual !== entries[0][1].toLowerCase()) throw new InstallerActionError(`SHA-256 verification failed for ${file}.`, 1);
+  if (actual !== entries[0][1]) throw new InstallerActionError(`SHA-256 verification failed for ${file}.`, 1);
 }
 
 /** Resolve the installed Sentinel launcher path for the current operating system. */
