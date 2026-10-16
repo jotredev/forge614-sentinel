@@ -18,6 +18,13 @@ test("dispatches to check and standard fetch (their --help)", () => {
   expect(JSON.parse(run(["bun", "run", CLI, "standard", "fetch", "--help"], { cwd: REPO_ROOT }).stdout.trim()).usage).toStartWith("standard fetch");
 });
 
+/** `--version` after a subcommand must reach that command's argument parser. */
+test("main does not intercept update --version as the standalone version flag", () => {
+  const result = run(["bun", "run", CLI, "update", "--version", "not-a-version", "--json"], { cwd: REPO_ROOT });
+  expect(result.exitCode).toBe(2);
+  expect(JSON.parse(result.stderr.trim())).toMatchObject({ code: "INVALID_ARGUMENTS" });
+});
+
 test("uninstall --self reports no integrations to remove without contacting the installer", () => {
   const json = run(["bun", "run", CLI, "uninstall", "--self", "--json"], { cwd: REPO_ROOT });
   expect(json.exitCode).toBe(0);

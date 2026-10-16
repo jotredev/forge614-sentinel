@@ -47,6 +47,24 @@ test("update downloads the loopback gate and runs it with --latest in a temporar
   });
 });
 
+/** A version-targeted update downloads that release's gate and forwards its v-prefixed tag. */
+test("version-targeted update downloads the requested release and forwards --version", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    let call: { command: string; args: string[] } | undefined;
+    await runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "darwin",
+      versionTag: "v0.2.0",
+      run: (command, args) => {
+        call = { command, args };
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    } as Parameters<typeof runInstallerGate>[1]);
+    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/download/v0.2.0/install.sh"]);
+    expect(call?.args).toEqual([expect.any(String), "--version", "v0.2.0"]);
+  });
+});
+
 test("uninstall downloads the loopback gate and runs it with --uninstall", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
     let args: string[] = [];
@@ -212,10 +230,48 @@ test("update --json reports the result after invoking the local published gate",
     writeFileSync(launcher, "#!/bin/sh\necho 'forge614-sentinel 0.2.1'\n");
     chmodSync(launcher, 0o755);
     const code = await updateMain(["--json"], env, { writeLine: (line) => stdout.push(line), writeError: (line) => stderr.push(line) });
-    expect(code).toBe(0);
+    expect(code, stderr.join("\n")).toBe(0);
     expect(stderr).toEqual([]);
     expect(JSON.parse(stdout[0] ?? "")).toEqual({ schemaVersion: 1, updated: false, previousVersion: "0.2.1", installedVersion: "0.2.1" });
     expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.sh"]);
+  });
+});
+
+/** The public update command targets a release when --version is supplied. */
+test("update --version X.Y.Z downloads that release and returns JSON", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const env = { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl };
+    const binDirectory = join(env.FORGE614_HOME, "sentinel", "bin");
+    mkdirSync(binDirectory, { recursive: true });
+    const launcher = join(binDirectory, "forge614-sentinel");
+    writeFileSync(launcher, "#!/bin/sh\necho 'forge614-sentinel 0.2.1'\n");
+    chmodSync(launcher, 0o755);
+    const code = await updateMain(["--version", "0.2.0", "--json"], {
+      ...env,
+    }, { writeLine: (line) => stdout.push(line), writeError: (line) => stderr.push(line) });
+    expect(code, stderr.join("\n")).toBe(0);
+    expect(stderr).toEqual([]);
+    expect(JSON.parse(stdout[0] ?? "")).toMatchObject({ schemaVersion: 1, updated: false, previousVersion: "0.2.1" });
+    expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/download/v0.2.0/install.sh"]);
+  });
+});
+
+/** The public update command rejects non-SemVer targets without contacting the server. */
+test("update --version rejects a non-SemVer target", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await updateMain(["--version", "not-a-version", "--json"], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+    }, { writeLine: (line) => stdout.push(line), writeError: (line) => stderr.push(line) });
+    expect(code).toBe(2);
+    expect(stdout).toEqual([]);
+    expect(JSON.parse(stderr[0] ?? "")).toMatchObject({ code: "INVALID_ARGUMENTS" });
+    expect(requests).toEqual([]);
   });
 });
 

@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { InstallerActionError, updateSentinel } from "../../app/installer-actions";
 import { issuesOf, parseMixed } from "./args";
-import { printVersionIfRequested, SENTINEL_VERSION } from "./version";
+import { SENTINEL_VERSION } from "./version";
 
-const USAGE = "update [--json]";
-const Args = z.object({ help: z.literal(true).optional(), json: z.literal(true).optional() }).strict();
+const USAGE = "update [--version X.Y.Z] [--json]";
+const Args = z.object({ help: z.literal(true).optional(), json: z.literal(true).optional(), version: z.string().regex(/^v?\d+\.\d+\.\d+$/).optional() }).strict();
 
 /** Output callbacks used by the update command and its tests. */
 export interface UpdateCommandIO {
@@ -20,8 +20,7 @@ export async function updateMain(
   env: Record<string, string | undefined> = process.env,
   io: UpdateCommandIO = { writeLine: (line) => process.stdout.write(`${line}\n`), writeError: (line) => process.stderr.write(`${line}\n`) },
 ): Promise<number> {
-  if (printVersionIfRequested(argv)) return 0;
-  const { flags, positionals } = parseMixed(argv, []);
+  const { flags, positionals } = parseMixed(argv, ["version"]);
   const parsed = Args.safeParse(flags);
   if (!parsed.success || positionals.length > 0) {
     io.writeError(JSON.stringify({ schemaVersion: 1, code: "INVALID_ARGUMENTS", error: parsed.success ? `unexpected argument '${positionals[0] ?? ""}'` : issuesOf(parsed.error) }));
@@ -32,7 +31,8 @@ export async function updateMain(
     return 0;
   }
   try {
-    const result = await updateSentinel(SENTINEL_VERSION, { env });
+    const versionTag = parsed.data.version === undefined ? undefined : `v${parsed.data.version.replace(/^v/, "")}`;
+    const result = await updateSentinel(SENTINEL_VERSION, { env, ...(versionTag === undefined ? {} : { versionTag }) });
     if (parsed.data.json) io.writeLine(JSON.stringify({ schemaVersion: 1, ...result }));
     else io.writeLine(result.updated
       ? `forge614-sentinel se actualizó de ${result.previousVersion} a ${result.installedVersion}.`

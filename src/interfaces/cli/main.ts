@@ -7,11 +7,13 @@ import { updateMain } from "./update";
 import { uninstallMain } from "./uninstall";
 import { printVersionIfRequested } from "./version";
 
-export const USAGE = `forge614-sentinel <command>: ${CHECK_USAGE} | ${FETCH_USAGE} | update [--json] | uninstall [--json] [--self] | --help | --version`;
+export const USAGE = `forge614-sentinel <command>: ${CHECK_USAGE} | ${FETCH_USAGE} | update [--version X.Y.Z] [--json] | uninstall [--json] [--self] | --help | --version`;
 
 export async function main(argv: string[]): Promise<number> {
   cleanupStaleWindowsLaunchers();
-  if (printVersionIfRequested(argv, true)) return 0;
+  const standaloneVersion = (argv.length === 1 && argv[0] === "--version")
+    || (argv.length === 2 && argv.includes("--version") && argv.includes("--json"));
+  if (standaloneVersion && printVersionIfRequested(argv, true)) return 0;
   const [command, ...rest] = argv;
   if (command === undefined || command === "--help") {
     printJson({ schemaVersion: 1, usage: USAGE, commands: ["check", "standard fetch", "update", "uninstall"], errorCodes: SENTINEL_ERROR_CODES });
