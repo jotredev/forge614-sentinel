@@ -31,6 +31,8 @@ export interface InstallerActionOptions {
   processExecPath?: string;
   /** Schedule deletion of an executable that Windows cannot delete while it is running. */
   scheduleDelete?: (command: string, args: string[]) => void;
+  /** Optional release tag to use for a version-targeted update. */
+  versionTag?: string;
 }
 
 /** Result returned by a successful self-update. */
@@ -78,11 +80,14 @@ function testBaseUrl(env: Record<string, string | undefined>): string | undefine
 }
 
 /** Return the full URL of the platform's latest published gatekeeper. */
-function installerUrl(platform: string, base: string | undefined): string {
+function installerUrl(platform: string, base: string | undefined, versionTag?: string): string {
   const file = platform === "win32" ? "install.ps1" : "install.sh";
+  const releasePath = versionTag === undefined
+    ? `releases/latest/download/${file}`
+    : `releases/download/${encodeURIComponent(versionTag)}/${file}`;
   return base === undefined
-    ? `https://github.com/${REPOSITORY}/releases/latest/download/${file}`
-    : `${base}/repos/${REPOSITORY}/releases/latest/download/${file}`;
+    ? `https://github.com/${REPOSITORY}/${releasePath}`
+    : `${base}/repos/${REPOSITORY}/${releasePath}`;
 }
 
 /** Resolve the installed Sentinel launcher path for the current operating system. */
@@ -160,7 +165,7 @@ export async function runInstallerGate(action: InstallerAction, options: Install
   const platform = options.platform ?? process.platform;
   const base = testBaseUrl(env);
   const file = platform === "win32" ? "install.ps1" : "install.sh";
-  const response = await (options.fetcher ?? fetch)(installerUrl(platform, base));
+  const response = await (options.fetcher ?? fetch)(installerUrl(platform, base, action === "update" ? options.versionTag : undefined));
   if (!response.ok) throw new Error("Could not download the Forge614 Sentinel installer.");
   const directory = mkdtempSync(join(tmpdir(), "forge614-sentinel-installer-"));
   const installer = join(directory, file);
@@ -168,9 +173,10 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     writeFileSync(installer, new Uint8Array(await response.arrayBuffer()), { mode: 0o700 });
     chmodSync(installer, 0o700);
     const processEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-    const flag = action === "update" ? "--latest" : "--uninstall";
+    const flag = action === "update" ? (options.versionTag === undefined ? "--latest" : "--version") : "--uninstall";
     const command = platform === "win32" ? "powershell.exe" : "bash";
-    const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, flag] : [installer, flag];
+    const actionArgs = options.versionTag === undefined ? [flag] : [flag, options.versionTag];
+    const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, ...actionArgs] : [installer, ...actionArgs];
     const parked = platform === "win32" ? parkRunningWindowsLauncher(action, env, options.processExecPath ?? process.execPath) : undefined;
     try {
       const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
