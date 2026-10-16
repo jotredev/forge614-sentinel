@@ -109,7 +109,7 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     const processEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
     const flag = action === "update" ? "--latest" : "--uninstall";
     const command = platform === "win32" ? "powershell.exe" : "bash";
-    const args = platform === "win32" ? ["-NoProfile", "-File", installer, flag] : [installer, flag];
+    const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, flag] : [installer, flag];
     const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
     if (result.exitCode !== 0) {
       const detail = result.stderr.trim();
