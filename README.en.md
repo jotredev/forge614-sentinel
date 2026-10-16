@@ -24,6 +24,12 @@ irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/insta
 
 Node.js 22.19.0 or later is required to install Sentinel.
 
+## Update and uninstall
+
+`forge614-sentinel update` installs the latest version. To choose a release explicitly, use `forge614-sentinel update --version 0.2.1` (it also accepts `v0.2.1`); add `--json` for structured output. Updating or uninstalling requires Node.js 22.19.0 or later.
+
+`forge614-sentinel uninstall` asks for confirmation in a terminal when `--json` is not used. Enter `s` or `y` to continue; any other response cancels with exit code `130`. `--json` skips the prompt for automation. `uninstall --self` never prompts and makes no changes because Sentinel has no assistant integrations.
+
 ## Documentation
 | # | Español | English |
 | --- | --- | --- |
