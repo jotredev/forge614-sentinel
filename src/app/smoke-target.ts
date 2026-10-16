@@ -40,7 +40,12 @@ export function smokeTarget(options: { root: string; target: Target; outDir: str
   try {
     const check = options.exec([binary, "check", "--repo", resolve(options.root, "fixtures/pass-node"), "--json"], {
       cwd: options.root,
-      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(resolve(options.root, "fixtures/standard")).href },
+      env: {
+        HOME: home,
+        FORGE614_HOME: join(home, ".forge614"),
+        FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(resolve(options.root, "fixtures/standard")).href,
+        GITHUB_REF_NAME: "",
+      },
     });
     const report = parseJson(Verdict, check.stdout);
     if (check.exitCode !== 0 || report === null || report.verdict !== "pass") return fail(`check on fixtures/pass-node: exit ${check.exitCode}, verdict ${report?.verdict ?? "?"}: ${check.stderr.trim()}`);

@@ -41,4 +41,5 @@ test("the fixture check uses temporary HOME and FORGE614_HOME paths", () => {
   smokeTarget({ root: repoRoot, target: "darwin-arm64", outDir: "/tmp/out", expectedVersion: "0.1.0", exec });
   expect(checkEnv?.HOME).toBeDefined();
   expect(checkEnv?.FORGE614_HOME?.startsWith(checkEnv?.HOME ?? "")).toBe(true);
+  expect(checkEnv?.GITHUB_REF_NAME).toBe("");
 });
