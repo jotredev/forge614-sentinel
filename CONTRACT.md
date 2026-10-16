@@ -14,7 +14,7 @@ Revisar cualquier repositorio del ecosistema contra el Estándar de Nodo que dec
 ## Qué no hace
 - No escribe en el repositorio revisado ni corrige nada.
 - No usa red durante las comprobaciones; solo para descargar el reglamento que falta en caché.
-- No revisa proyectos de terceros ni reglamentos de terceros (entregas futuras); no ejecuta el nodo (`import-rules`, `boundaries-zod`, `machine-contracts` llegan en 0.2).
+- No revisa proyectos de terceros ni reglamentos de terceros (entregas futuras); no ejecuta el nodo (`import-rules`, `boundaries-zod` llegan en 0.2; `machine-contracts`, en 0.3).
 
 ## Dependencias
 | Nodo o binario | Cómo se consume | Versión mínima |
@@ -31,7 +31,7 @@ Revisar cualquier repositorio del ecosistema contra el Estándar de Nodo que dec
 ## Comandos públicos
 | Comando | Entrada (esquema) | Salida (esquema) | `schemaVersion` | Códigos de salida |
 | --- | --- | --- | --- | --- |
-| `forge614-sentinel check` | `[--repo <ruta>] [--standard <X.Y.Z>] [--only <id,id>] [--strict] [--json]` | `CheckReport` o `{ applicable: false, reason }` | `1` | `0` pass, caution, no aplicable; `1` fail, caution con `--strict`, `STANDARD_UNAVAILABLE`, `STANDARD_CORRUPT`, `STANDARD_FETCH_FAILED`, `CHECK_FAILED`, `SENTINEL_FAILED`; `2` `INVALID_ARGUMENTS`, `NODE_POINTER_INVALID` |
+| `forge614-sentinel check` | `[--repo <ruta>] [--standard <X.Y.Z>] [--only <id,id>] [--strict] [--json]` | `CheckReport` o `{ applicable: false, reason }` | `1` | `0` pass, caution, no aplicable; `1` fail, caution con `--strict`, `NODE_POINTER_MISSING`, `STANDARD_UNAVAILABLE`, `STANDARD_CORRUPT`, `STANDARD_FETCH_FAILED`, `CHECK_FAILED`, `SENTINEL_FAILED`; `2` `INVALID_ARGUMENTS`, `NODE_POINTER_INVALID` |
 | `forge614-sentinel standard fetch` | `[<X.Y.Z>] [--json]` (sin versión usa `./forge614.node.json`) | `{ version, sha256, alreadyCached, location }` | `1` | `0`; `1` `STANDARD_FETCH_FAILED`, `STANDARD_CORRUPT`, `SENTINEL_FAILED`; `2` `INVALID_ARGUMENTS` |
 | `bun run verify` | `[--skip-tests]` | `{ ok: true, steps, sentinel: { verdict, durationMs } }` | `1` | `0`; `1` `VERIFY_STEP_FAILED`, `VERIFY_FAILED`; `2` `INVALID_ARGUMENTS` |
 | `bun run sentinel:check` | ninguna (alias de `check --repo . --json`) | `CheckReport` | `1` | los de `check` |
@@ -50,6 +50,7 @@ Toda salida de datos es un solo objeto JSON en stdout con `schemaVersion: 1`; to
 | --- | --- |
 | `INVALID_ARGUMENTS` | flag desconocido, valor inválido, `--only` con id inexistente, argumento posicional inesperado; salida `2` |
 | `NODE_POINTER_INVALID` | `forge614.node.json` no cumple `NodePointerSchema`; salida `2` |
+| `NODE_POINTER_MISSING` | `.forge614/project.json` declara `ecosystem.name: "forge614"`, pero falta `forge614.node.json`; salida `1` |
 | `STANDARD_UNAVAILABLE` | la versión declarada no está en caché y no hay red; el mensaje trae el comando `standard fetch` |
 | `STANDARD_CORRUPT` | la huella del paquete (descargado o en caché) no coincide con la pedida o con `SHA256SUMS`; no se guarda nada |
 | `STANDARD_FETCH_FAILED` | error de red o de release al descargar el reglamento |

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "productVersion": "0.1.1",
+  "productVersion": "0.2.0",
   "pages": [
     {
       "es": "docs/es/00-resumen-y-guia-rapida.md",
@@ -12,8 +12,8 @@
     {
       "es": "docs/es/01-comprobaciones.md",
       "en": "docs/en/01-checks.md",
-      "sha256Es": "04604df11a3b388a9bca4c7a436ec3e6c2c2042738c56b2fd722f98598c518a8",
-      "sha256En": "2a5f7398394804e5a57c0871ae4b26bd17251a09a32c7fcbcbebbe0c51981fdf",
+      "sha256Es": "0ab9ec00b17723193c84230797e72940fcad25a3d4a1c74085138bf704d594ae",
+      "sha256En": "167526c6743231e7118f471735fde7c1bb70f0a7e64460b6adad080ba24a3145",
       "notionPageId": null
     },
     {
