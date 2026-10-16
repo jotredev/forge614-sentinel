@@ -42,7 +42,8 @@ export async function uninstallMain(
     else io.writeLine("forge614-sentinel se desinstaló.");
     return 0;
   } catch (error) {
-    io.writeError(JSON.stringify({ schemaVersion: 1, code: "UNINSTALL_FAILED", error: "No se pudo desinstalar Forge614 Sentinel." }));
+    const detail = error instanceof InstallerActionError ? error.message : "";
+    io.writeError(JSON.stringify({ schemaVersion: 1, code: "UNINSTALL_FAILED", error: `No se pudo desinstalar Forge614 Sentinel.${detail ? ` ${detail}` : ""}` }));
     return error instanceof InstallerActionError && error.exitCode === 130 ? 130 : 1;
   }
 }
