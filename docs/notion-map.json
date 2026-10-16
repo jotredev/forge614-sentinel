@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "productVersion": "0.2.0",
+  "productVersion": "0.2.1",
   "pages": [
     {
       "es": "docs/es/00-resumen-y-guia-rapida.md",
       "en": "docs/en/00-summary-and-quickstart.md",
-      "sha256Es": "65311bd39316476a2a09370f285f861ac81c9aba5d25c39d946e0d9ae0315eb8",
-      "sha256En": "54f482a90420c8a17f0ecaedf16ee7cf04ca6b198ed183929a3e1494aceb5587",
+      "sha256Es": "1eff6c0c0fb7b8e6059de00876df989daac3f01239d28466c1189c9c38eacb79",
+      "sha256En": "507e2d8934d93f8f89825c13381c961d64aa3483dba29ca60ded945cffd71385",
       "notionPageId": null
     },
     {
@@ -26,8 +26,8 @@
     {
       "es": "docs/es/03-integracion.md",
       "en": "docs/en/03-integration.md",
-      "sha256Es": "9306d34a03336440ad271a6bd761b21be22c843f299a59675b05ce157b75ad66",
-      "sha256En": "bb03756eb08f51803833e2648e5660fb538e591318d6bb52c83358f513d5f59c",
+      "sha256Es": "44324b38d0f8bc2199bebeb25f8bef85f060bfb81f4472d9cba3b0de65aea65d",
+      "sha256En": "670922bf66e58c7237adadbf43d4bc62501684b124fe789b515855bff1127f52",
       "notionPageId": null
     },
     {

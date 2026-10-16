@@ -10,7 +10,7 @@ Decide qué hacer solo por archivos de identidad (acta 0023): con `forge614.node
 
 ## Instalar y ejecutar en un minuto
 
-macOS / Linux: `curl -fsSL https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.sh | bash`. Windows: `irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex`. El instalador deja el binario en `~/.forge614/sentinel/<versión>/` y el lanzador en `~/.forge614/sentinel/bin/forge614-sentinel`; comprueba la huella publicada en `SHA256SUMS` antes de instalar.
+macOS / Linux: `curl -fsSL https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.sh | bash`. Windows (PowerShell): `irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex`. Se requiere Node.js 22.19.0 o posterior para instalar. El instalador deja el binario en `~/.forge614/sentinel/<versión>/` y el lanzador en `~/.forge614/sentinel/bin/forge614-sentinel`; comprueba la huella publicada en `SHA256SUMS` antes de instalar.
 
 En la raíz de un nodo: `forge614-sentinel check --json`. La primera vez descarga el reglamento declarado (documento 02); las siguientes no usan red. Código de salida `0` con `pass` o `caution`, `1` con `fail`, `2` con argumentos inválidos.
 
