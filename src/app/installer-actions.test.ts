@@ -113,6 +113,29 @@ test("a missing gatekeeper checksum entry prevents execution and exits with code
   }, "#!/bin/sh\nexit 0\n", `${"0".repeat(64)}  install.ps1\n`);
 });
 
+/** Gatekeeper manifests reject non-canonical GNU lines and repeated entries before execution. */
+test("strict SHA256SUMS rejects malformed and duplicate gatekeeper lines", async () => {
+  const hash = createHash("sha256").update("#!/bin/sh\nexit 0\n").digest("hex");
+  const malformed = [
+    `${hash.toUpperCase()}  install.sh\n`,
+    `${hash} *install.sh\n`,
+    `${hash} install.sh\n`,
+    `${hash}  install.sh\n${hash}  install.sh\n`,
+    `${hash}  install.sh\nmalformed manifest line\n`,
+  ];
+  for (const sums of malformed) {
+    await withGateServer(async (baseUrl, _requests, home) => {
+      let executed = false;
+      await expect(runInstallerGate("update", {
+        env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+        platform: "darwin",
+        run: () => { executed = true; return { exitCode: 0, stdout: "", stderr: "" }; },
+      })).rejects.toMatchObject({ exitCode: 1 });
+      expect(executed).toBe(false);
+    }, "#!/bin/sh\nexit 0\n", sums);
+  }
+});
+
 test("uninstall downloads the loopback gate and runs it with --uninstall", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
     let args: string[] = [];
