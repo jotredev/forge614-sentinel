@@ -29,8 +29,10 @@ export interface InstallerActionOptions {
   run?: InstallerProcess;
   /** Executable path of the running Sentinel process; injectable for platform tests. */
   processExecPath?: string;
+  /** Process ID of the running Sentinel process; injectable for platform tests. */
+  processId?: number;
   /** Schedule deletion of an executable that Windows cannot delete while it is running. */
-  scheduleDelete?: (command: string, args: string[]) => void;
+  scheduleDelete?: (command: string, args: string[], options: { env: Record<string, string>; detached: true; stdio: "ignore"; windowsHide: true }) => void;
   /** Optional release tag to use for a version-targeted update. */
   versionTag?: string;
 }
@@ -152,28 +154,50 @@ function restoreParkedWindowsLauncher(parked: { original: string; parked: string
 /** Best-effort cleanup for old launchers left beside the Windows installation. */
 export function cleanupStaleWindowsLaunchers(options: { env?: Record<string, string | undefined>; platform?: string } = {}): void {
   if ((options.platform ?? process.platform) !== "win32") return;
-  const directory = dirname(installedLauncher(options.env ?? process.env, "win32"));
-  let entries: Dirent[];
-  try {
-    entries = readdirSync(directory, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (!entry.isFile() || !/^forge614-sentinel\.exe\.old-.+$/i.test(entry.name)) continue;
-    try { rmSync(join(directory, entry.name), { force: true }); } catch { /* stale launcher cleanup is best-effort */ }
+  const env = options.env ?? process.env;
+  const directories = [dirname(installedLauncher(env, "win32")), installationHome(env)];
+  for (const directory of directories) {
+    let entries: Dirent[];
+    try {
+      entries = readdirSync(directory, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      const stale = directory === installationHome(env)
+        ? /^\.forge614-sentinel-old-.+\.exe$/i.test(entry.name)
+        : /^forge614-sentinel\.exe\.old-.+$/i.test(entry.name);
+      if (!entry.isFile() || !stale) continue;
+      try { rmSync(join(directory, entry.name), { force: true }); } catch { /* stale launcher cleanup is best-effort */ }
+    }
   }
 }
 
-/** Schedule deletion of a parked Windows executable after its process has exited. */
-function scheduleWindowsLauncherRemoval(file: string, scheduler: (command: string, args: string[]) => void): void {
-  const command = `timeout /t 3 /nobreak >nul & del /f /q "${file.replaceAll('"', '""')}"`;
-  scheduler("cmd.exe", ["/d", "/c", command]);
+/** Schedule deletion after Sentinel exits, keeping the parked path in the child environment. */
+function scheduleWindowsLauncherRemoval(
+  file: string,
+  processId: number,
+  env: Record<string, string | undefined>,
+  scheduler: (command: string, args: string[], options: { env: Record<string, string>; detached: true; stdio: "ignore"; windowsHide: true }) => void,
+): void {
+  const script = `try { Wait-Process -Id ${processId} -Timeout 30 -ErrorAction SilentlyContinue } catch {}; Remove-Item -LiteralPath $env:FORGE614_SENTINEL_PARKED -Force -ErrorAction SilentlyContinue`;
+  const encoded = Buffer.from(script, "utf16le").toString("base64");
+  const childEnv = Object.fromEntries(Object.entries({ ...process.env, ...env, FORGE614_SENTINEL_PARKED: file }).filter((entry): entry is [string, string] => entry[1] !== undefined));
+  scheduler("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-NonInteractive", "-EncodedCommand", encoded], {
+    env: childEnv,
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  });
 }
 
-/** Start the detached Windows command that removes the parked executable. */
-function spawnWindowsLauncherRemoval(command: string, args: string[]): void {
-  const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true });
+/** Start the detached PowerShell process that removes the parked executable. */
+function spawnWindowsLauncherRemoval(
+  command: string,
+  args: string[],
+  options: { env: Record<string, string>; detached: true; stdio: "ignore"; windowsHide: true },
+): void {
+  const child = spawn(command, args, options);
   child.unref();
 }
 
@@ -236,7 +260,9 @@ export async function runInstallerGate(action: InstallerAction, options: Install
       }
     }
     if (parked && action === "uninstall") {
-      try { scheduleWindowsLauncherRemoval(parked.parked, options.scheduleDelete ?? spawnWindowsLauncherRemoval); } catch { /* cleanup is best-effort */ }
+      try {
+        scheduleWindowsLauncherRemoval(parked.parked, options.processId ?? process.pid, env, options.scheduleDelete ?? spawnWindowsLauncherRemoval);
+      } catch { /* cleanup is best-effort */ }
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
