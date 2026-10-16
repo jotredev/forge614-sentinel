@@ -63,7 +63,7 @@ test("update downloads the loopback gate and runs it with --latest in a temporar
     });
     expect(requests).toEqual(latestGateRequests("install.sh"));
     expect(calls).toHaveLength(1);
-    expect(calls[0]?.command).toBe("bash");
+    expect(calls[0]?.command).toBe("sh");
     expect(calls[0]?.args[1]).toBe("--latest");
     expect(calls[0]?.options?.env).toMatchObject({ FORGE614_INSTALL_TEST_BASE_URL: baseUrl, FORGE614_HOME: join(home, ".forge614") });
   });
