@@ -1,4 +1,5 @@
 import { checkMain, CHECK_USAGE } from "./check";
+import { cleanupStaleWindowsLaunchers } from "../../app/installer-actions";
 import { SENTINEL_ERROR_CODES } from "./codes";
 import { printError, printJson, runCli } from "./output";
 import { FETCH_USAGE, standardFetchMain } from "./standard-fetch";
@@ -9,6 +10,7 @@ import { printVersionIfRequested } from "./version";
 export const USAGE = `forge614-sentinel <command>: ${CHECK_USAGE} | ${FETCH_USAGE} | update [--json] | uninstall [--json] [--self] | --help | --version`;
 
 export async function main(argv: string[]): Promise<number> {
+  cleanupStaleWindowsLaunchers();
   if (printVersionIfRequested(argv, true)) return 0;
   const [command, ...rest] = argv;
   if (command === undefined || command === "--help") {
