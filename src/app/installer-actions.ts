@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync, type Dirent } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync, type Dirent } from "node:fs";
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
@@ -174,9 +174,17 @@ function installationHome(env: Record<string, string | undefined>): string {
   return environmentValue(env, "FORGE614_HOME") || join(environmentValue(env, "HOME") || environmentValue(env, "USERPROFILE") || homedir(), ".forge614");
 }
 
-/** Compare Windows paths using Windows separators and case-insensitive matching. */
+/** Resolve path aliases when possible, then compare Windows paths case-insensitively. */
 function sameWindowsPath(left: string, right: string): boolean {
-  return win32.normalize(left).replaceAll("/", "\\").toLocaleLowerCase("en-US") === win32.normalize(right).replaceAll("/", "\\").toLocaleLowerCase("en-US");
+  let resolvedLeft = left;
+  let resolvedRight = right;
+  try {
+    resolvedLeft = realpathSync.native(left);
+    resolvedRight = realpathSync.native(right);
+  } catch { /* fall back to normalized paths when either path cannot be resolved */ }
+  const normalizedLeft = win32.normalize(resolvedLeft).replaceAll("/", "\\").toLocaleLowerCase("en-US");
+  const normalizedRight = win32.normalize(resolvedRight).replaceAll("/", "\\").toLocaleLowerCase("en-US");
+  return normalizedLeft === normalizedRight;
 }
 
 /** Park the active installed launcher so the Windows installer can replace or remove its node directory. */

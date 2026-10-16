@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -181,6 +181,28 @@ test("Windows update parks the running launcher beside itself before invoking th
     } as Parameters<typeof runInstallerGate>[1]);
     expect(readFileSync(launcher, "utf8")).toBe("replacement launcher");
     expect(readdirSync(dirname(launcher)).some((name) => name.startsWith("forge614-sentinel.exe.old-"))).toBe(true);
+  });
+});
+
+/** Windows launcher matching resolves a symlink alias before comparing executable paths. */
+test("Windows update recognizes a process executable path that resolves to the installed launcher", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const launcher = join(home, ".forge614", "sentinel", "bin", "forge614-sentinel.exe");
+    const alias = join(home, "launcher-alias.exe");
+    mkdirSync(dirname(launcher), { recursive: true });
+    writeFileSync(launcher, "running launcher");
+    symlinkSync(launcher, alias);
+    await runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "win32",
+      processExecPath: alias,
+      run: () => {
+        expect(existsSync(launcher)).toBe(false);
+        expect(readdirSync(dirname(launcher)).some((name) => name.startsWith("forge614-sentinel.exe.old-"))).toBe(true);
+        return { exitCode: 0, stdout: "already up to date", stderr: "" };
+      },
+    } as Parameters<typeof runInstallerGate>[1]);
+    expect(readFileSync(launcher, "utf8")).toBe("running launcher");
   });
 });
 
