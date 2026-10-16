@@ -1,1 +1,1 @@
-export const KEY = "AKIAIOSFODNN7EXAMPLE";
+export const KEY = "AKIAIOSFODNN7TESTKEY";

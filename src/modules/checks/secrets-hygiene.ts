@@ -29,14 +29,17 @@ export const secretsHygieneCheck: CheckDefinition = {
         ? `secret patterns source: builtin (standard ${params.standard.version} ships no secret-patterns.json)`
         : "secret patterns source: standard/secret-patterns.json",
     ];
-    const matchers = params.secrets.patterns.map((p) => [p.id, new RegExp(p.pattern)] as const);
+    const matchers = params.secrets.patterns.map((p) => [p.id, new RegExp(p.pattern, "g")] as const);
     const hits: string[] = [];
     for (const [path, text] of snapshot.files) {
       if (isExcluded(path, params.secrets.excludePaths)) continue;
       const name = basename(path);
       const envWithValues = ENV_FILE.test(name) && !ENV_EXAMPLE.test(name);
       text.split("\n").forEach((line, i) => {
-        for (const [id, re] of matchers) if (re.test(line)) hits.push(`${path}:${i + 1}: ${id}`);
+        for (const [id, re] of matchers) {
+          const matches = [...line.matchAll(re)].map((match) => match[0]);
+          if (matches.some((matched) => !params.secrets.allowedMarkers.some((marker) => matched.includes(marker)))) hits.push(`${path}:${i + 1}: ${id}`);
+        }
         if (!envWithValues) return;
         const m = ENV_LINE.exec(line);
         if (m?.[1] !== undefined && !PLACEHOLDER.test(unquote(m[2] ?? ""))) hits.push(`${path}:${i + 1}: .env value for ${m[1]}`);

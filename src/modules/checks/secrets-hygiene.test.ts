@@ -54,3 +54,25 @@ test(".env.example, .env.sample and .env.template are never flagged for values; 
   const s = snapshotFrom({ ".env.example": "K=real-looking-value\n", ".env.sample": "K=v\n", ".env": "K=<fill me>\nJ=${VAR}\nL=changeme\n" });
   expect(secretsHygieneCheck.run(s, params).verdict).toBe("pass");
 });
+
+test("allows approved markers only when they occur in the matched text", () => {
+  const s = snapshotFrom({
+    "docs/examples.md": "AKIAIOSFODNN7EXAMPLE postgres://user:secret@db.internal/app https://user:pass@localhost/api http://user:pass@127.0.0.1/api\n",
+    "src/config.ts": ["const url = `postgres://dbuser:", "rotatingSecret@db.internal/app`;\n"].join(""),
+  });
+  const r = secretsHygieneCheck.run(s, params);
+  expect(r.verdict).toBe("fail");
+  expect(r.evidence).toEqual([
+    "secret patterns source: builtin (standard 1.0.0 ships no secret-patterns.json)",
+    "src/config.ts:1: connection-string-with-credentials",
+  ]);
+});
+
+test("private-key headers are detected only at the start of a line", () => {
+  const s = snapshotFrom({
+    "docs/history.md": "Example: -----BEGIN RSA PRIVATE KEY-----\n",
+    "keys/server.pem": "-----BEGIN RSA PRIVATE KEY-----\n",
+  });
+  expect(secretsHygieneCheck.run(s, params).evidence).toContain("keys/server.pem:1: private-key");
+  expect(secretsHygieneCheck.run(s, params).evidence.some((line) => line.startsWith("docs/history.md:"))).toBe(false);
+});
