@@ -9,12 +9,13 @@ import { archiveName, TARGETS, type Exec } from "./build-target";
 function assetsDir(missing?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "sentinel-assets-"));
   for (const t of TARGETS) if (archiveName(t) !== missing) writeFileSync(join(dir, archiveName(t)), `bin-${t}`);
+  for (const name of ["install.sh", "install.ps1", "install.mjs", "forge614.node.json", "SHA256SUMS"]) writeFileSync(join(dir, name), `prepared-${name}`);
   return dir;
 }
 
 const okExec: Exec = () => ({ exitCode: 0, stdout: "https://github.com/jotredev/forge614-sentinel/releases/tag/v0.1.0\n", stderr: "" });
 
-test("dry run: writes SHA256SUMS (sha256sum format) and returns the gh command without executing", () => {
+test("dry run: publishes all prepared release files without rewriting SHA256SUMS", () => {
   const dir = assetsDir();
   const calls: string[][] = [];
   const r = releasePublish({ root: repoRoot, tag: "v0.1.0", version: "0.1.0", assetsDir: dir, exec: (cmd) => { calls.push(cmd); return okExec(cmd); }, dryRun: true });
@@ -23,12 +24,12 @@ test("dry run: writes SHA256SUMS (sha256sum format) and returns the gh command w
   expect(calls).toHaveLength(0);
   expect(r.published).toBe(false);
   expect(r.command.slice(0, 4)).toEqual(["gh", "release", "create", "v0.1.0"]);
-  expect(r.command).toContain(`${join(repoRoot, "install.sh")}#install.sh`);
-  expect(r.command).toContain(`${join(repoRoot, "install.ps1")}#install.ps1`);
+  expect(r.command).toContain(join(dir, "install.sh"));
+  expect(r.command).toContain(join(dir, "install.ps1"));
   expect(r.command).not.toContain("--prerelease");
-  const sums = readFileSync(join(dir, "SHA256SUMS"), "utf8").trim().split("\n");
-  expect(sums).toHaveLength(5);
-  for (const line of sums) expect(line).toMatch(/^[a-f0-9]{64}  forge614-sentinel-[a-z0-9-]+\.(tar\.gz|zip)$/);
+  expect(r.assets).toHaveLength(10);
+  for (const name of ["install.mjs", "forge614.node.json", "SHA256SUMS"]) expect(r.command).toContain(join(dir, name));
+  expect(readFileSync(join(dir, "SHA256SUMS"), "utf8")).toBe("prepared-SHA256SUMS");
 });
 
 test("tag must be v<package.json version>; a missing asset aborts before gh; a failing gh is RELEASE_PUBLISH_FAILED; a hyphenated tag is a prerelease", () => {

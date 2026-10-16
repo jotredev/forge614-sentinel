@@ -19,7 +19,8 @@ beforeAll(() => {
 // largest tree at hand, with git facts) is the measured case; the fixture
 // warms the cache first so the run measures checking, not downloading.
 test(`checks this repository in under ${BUDGET_MS} ms (wall clock and durationMs)`, () => {
-  const env = { FORGE614_HOME: mkdtempSync(join(tmpdir(), "sentinel-budget-")), FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(join(REPO_ROOT, "fixtures/standard")).href };
+  const home = mkdtempSync(join(tmpdir(), "sentinel-budget-user-"));
+  const env = { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(join(REPO_ROOT, "fixtures/standard")).href };
   run([bin, "standard", "fetch", "1.0.0"], { cwd: REPO_ROOT, env });
   const started = performance.now();
   const r = run([bin, "check", "--repo", REPO_ROOT, "--json"], { cwd: REPO_ROOT, env, timeoutMs: 30_000 });

@@ -9,7 +9,7 @@ const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const VersionEnvelope = z.object({ schemaVersion: z.literal(1), name: z.literal(PRODUCT_NAME), version: z.literal(SENTINEL_VERSION) }).strict();
 
 // Every entry point in this folder answers --version before anything else.
-const HELPERS = new Set(["output.ts", "version.ts", "args.ts", "codes.ts"]);
+const HELPERS = new Set(["output.ts", "version.ts", "args.ts", "codes.ts", "update.ts", "uninstall.ts"]);
 const CLIS = readdirSync(import.meta.dir).filter((n) => n.endsWith(".ts") && !n.endsWith(".test.ts") && !HELPERS.has(n)).sort();
 
 describe("--version in every CLI", () => {
@@ -17,11 +17,18 @@ describe("--version in every CLI", () => {
   // development CLIs join the list as their tasks add them.
   test("there are entry points to check", () => expect(CLIS.length).toBeGreaterThan(0));
   for (const cli of CLIS) {
-    test(`${cli} --version exits 0 with { schemaVersion, name, version }`, () => {
+    test(`${cli} --version follows its public output contract`, () => {
       const r = run(["bun", "run", resolve(import.meta.dir, cli), "--version"], { cwd: REPO_ROOT });
       expect(r.exitCode, r.stderr).toBe(0);
       expect(r.stderr).toBe("");
-      expect(VersionEnvelope.safeParse(JSON.parse(r.stdout.trim())).success).toBe(true);
+      if (cli === "main.ts") {
+        expect(r.stdout).toBe(`${PRODUCT_NAME} ${SENTINEL_VERSION}\n`);
+        const json = run(["bun", "run", resolve(import.meta.dir, cli), "--version", "--json"], { cwd: REPO_ROOT });
+        expect(json.exitCode).toBe(0);
+        expect(VersionEnvelope.safeParse(JSON.parse(json.stdout.trim())).success).toBe(true);
+      } else {
+        expect(VersionEnvelope.safeParse(JSON.parse(r.stdout.trim())).success).toBe(true);
+      }
     });
   }
 });

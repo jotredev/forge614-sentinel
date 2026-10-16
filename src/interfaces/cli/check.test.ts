@@ -10,7 +10,7 @@ import { CheckReportSchema } from "../../modules/report";
 const CLI = resolve(import.meta.dir, "check.ts");
 const REPO_ROOT = resolve(import.meta.dir, "../../..");
 const FIXTURES = join(REPO_ROOT, "fixtures");
-const env = () => ({ FORGE614_HOME: mkdtempSync(join(tmpdir(), "sentinel-cli-")), FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(join(FIXTURES, "standard")).href });
+const env = () => ({ HOME: mkdtempSync(join(tmpdir(), "sentinel-cli-user-")), FORGE614_HOME: mkdtempSync(join(tmpdir(), "sentinel-cli-forge-")), FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(join(FIXTURES, "standard")).href });
 
 function cli(args: string[], extraEnv: Record<string, string> = {}) {
   return run(["bun", "run", CLI, ...args], { cwd: REPO_ROOT, env: { ...env(), ...extraEnv } });

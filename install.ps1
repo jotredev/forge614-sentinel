@@ -1,71 +1,105 @@
-# Forge614 node installer (Windows) — rendered from forge614-ai/standard/templates/install.ps1 (standard 1.0.2).
-param([string]$Version = "", [string]$Archive = "", [switch]$Uninstall)
+﻿$InstallerArgs = @($args)
 $ErrorActionPreference = "Stop"
-$NodeName = "sentinel"; $Repo = "jotredev/forge614-sentinel"; $AssetPrefix = "forge614-sentinel"
-$Forge614Home = if ($env:FORGE614_HOME) { $env:FORGE614_HOME } else { Join-Path $HOME ".forge614" }
-$NodeHome = Join-Path $Forge614Home $NodeName
-$BinDir = Join-Path $NodeHome "bin"
-$Launcher = Join-Path $BinDir "forge614-$NodeName.exe"
+if ([Console]::IsOutputRedirected -or [Console]::IsErrorRedirected) {
+  try { [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false) } catch { }
+}
+$NodeName = "sentinel"
+$Repo = "jotredev/forge614-sentinel"
 
-if ($Uninstall) {
-  if (Test-Path $Launcher) { & $Launcher uninstall --self; if ($LASTEXITCODE -ne 0) { throw "node refused to uninstall its integrations; nothing removed" } }
-  if (Test-Path $NodeHome) { Remove-Item -Recurse -Force $NodeHome }
-  Write-Host "removed $NodeHome"; exit 0
+function Get-RootExceptionText {
+  param([System.Exception]$Exception)
+  $Current = $Exception
+  while ($null -ne $Current.InnerException) { $Current = $Current.InnerException }
+  return $Current.Message
 }
 
-# Migración de instalaciones anteriores al estándar: perfil de PowerShell del usuario con un bloque PATH
-# marcado. Un nodo alineado nunca edita PATH; solo forge614-ai crea el comando global. El perfil se
-# respalda antes de tocarlo. No hay instalación plana que migrar en Windows: el lanzador ya es una copia,
-# nunca un binario compartido con otra versión.
-$MarkBegin = "# >>> forge614-$NodeName PATH >>>"
-$MarkEnd = "# <<< forge614-$NodeName PATH <<<"
-function Remove-LegacyPathBlock {
-  param([string]$ProfilePath)
-  if (-not (Test-Path $ProfilePath)) { return }
-  $lines = Get-Content -LiteralPath $ProfilePath
-  if (-not ($lines -contains $MarkBegin)) { return }
-  $stamp = Get-Date -Format "yyyyMMddHHmmss"
-  Copy-Item -LiteralPath $ProfilePath -Destination "$ProfilePath.forge614-backup-$stamp"
-  $kept = @(); $skip = $false
-  foreach ($line in $lines) {
-    if ($line -eq $MarkBegin) { $skip = $true; continue }
-    if ($line -eq $MarkEnd) { $skip = $false; continue }
-    if (-not $skip) { $kept += $line }
+function Get-Sha256 {
+  param([string]$Path)
+  $Algorithm = [System.Security.Cryptography.SHA256]::Create()
+  $Stream = [System.IO.File]::OpenRead($Path)
+  try {
+    $Bytes = $Algorithm.ComputeHash($Stream)
+    return ([System.BitConverter]::ToString($Bytes)).Replace("-", "").ToLowerInvariant()
+  } finally {
+    $Stream.Dispose()
+    $Algorithm.Dispose()
   }
-  Set-Content -LiteralPath $ProfilePath -Value $kept
-  Write-Host "removed legacy PATH block from $ProfilePath (backup kept next to it)"
-}
-function Invoke-LegacyMigration {
-  Remove-LegacyPathBlock -ProfilePath $PROFILE.CurrentUserAllHosts
-  Remove-LegacyPathBlock -ProfilePath $PROFILE.CurrentUserCurrentHost
 }
 
-$Arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { throw "unsupported architecture" }
-$Platform = "windows-$Arch"
-$Tmp = Join-Path ([IO.Path]::GetTempPath()) ("forge614-" + [Guid]::NewGuid())
-New-Item -ItemType Directory -Path $Tmp | Out-Null
+function Write-NodeRequirement {
+  if ($env:FORGE614_LOCALE -like "en*" -or (-not $env:FORGE614_LOCALE -and $env:FORGE614_SHELL_LOCALE -like "en*")) {
+    [Console]::Error.WriteLine("Forge614 requires Node.js 22.19.0 or later to install. Install it with Homebrew: brew install node; on Linux, use your distribution's package manager or https://nodejs.org; on Windows, use winget install OpenJS.NodeJS.LTS or https://nodejs.org. Then run this installer again.")
+  } else {
+    [Console]::Error.WriteLine("Forge614 necesita Node.js 22.19.0 o posterior para instalarse. Instálalo con Homebrew: brew install node; en Linux, con el gestor de paquetes de tu distribución o desde https://nodejs.org; en Windows, con winget install OpenJS.NodeJS.LTS o desde https://nodejs.org. Después vuelve a ejecutar este instalador.")
+  }
+}
+
+$NodeCommand = Get-Command node -ErrorAction SilentlyContinue
+if ($null -eq $NodeCommand) { Write-NodeRequirement; exit 65 }
+$NodeVersion = (& $NodeCommand.Source --version 2>$null).Trim().TrimStart("v")
+$VersionParts = $NodeVersion.Split(".")
+if ($VersionParts.Count -lt 2 -or [int]$VersionParts[0] -lt 22 -or ([int]$VersionParts[0] -eq 22 -and [int]$VersionParts[1] -lt 19)) {
+  Write-NodeRequirement
+  exit 65
+}
+
+$Tag = "latest"
+$TagWasSet = $false
+for ($Index = 0; $Index -lt $InstallerArgs.Count; $Index++) {
+  if (-not $TagWasSet -and $InstallerArgs[$Index] -eq "--latest") { $Tag = "latest"; $TagWasSet = $true }
+  if (-not $TagWasSet -and $InstallerArgs[$Index] -eq "--version") {
+    if ($Index + 1 -ge $InstallerArgs.Count) { [Console]::Error.WriteLine("invalid value for --version"); exit 64 }
+    $Tag = $InstallerArgs[$Index + 1]
+    $TagWasSet = $true
+  }
+}
+
+$TestBase = $env:FORGE614_INSTALL_TEST_BASE_URL
+if ($TestBase) {
+  $TestUri = $null
+  if ($TestBase -notmatch '^http://(127\.0\.0\.1|\[::1\]):[0-9]+/?$' -or -not [System.Uri]::TryCreate($TestBase, [System.UriKind]::Absolute, [ref]$TestUri) -or $TestUri.Scheme -ne "http" -or $TestUri.Port -lt 1 -or ($TestUri.Host -ne "127.0.0.1" -and $TestUri.Host -ne "[::1]" -and $TestUri.Host -ne "::1") -or $TestUri.AbsolutePath -ne "/" -or $TestUri.Query -or $TestUri.Fragment -or $TestUri.UserInfo) {
+    [Console]::Error.WriteLine("FORGE614_INSTALL_TEST_BASE_URL only accepts loopback HTTP.")
+    exit 64
+  }
+  $Base = $TestUri.GetLeftPart([System.UriPartial]::Authority)
+} else {
+  $Base = "https://github.com/$Repo/releases"
+}
+
+$TemporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ("forge614-" + [Guid]::NewGuid().ToString("N"))
 try {
-  if (-not $Archive) {
-    if (-not $Version) {
-      $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ Accept = "application/vnd.github+json" }
-      $Version = $Release.tag_name.TrimStart("v")
-    }
-    $Base = "https://github.com/$Repo/releases/download/v$Version"
-    $Asset = "$AssetPrefix-$Platform.zip"
-    Invoke-WebRequest -Uri "$Base/$Asset" -OutFile (Join-Path $Tmp $Asset)
-    Invoke-WebRequest -Uri "$Base/SHA256SUMS" -OutFile (Join-Path $Tmp "SHA256SUMS")
-    $Expected = (Get-Content (Join-Path $Tmp "SHA256SUMS") | Where-Object { $_ -match " $([regex]::Escape($Asset))$" }) -split "\s+" | Select-Object -First 1
-    $Actual = (Get-FileHash -Algorithm SHA256 (Join-Path $Tmp $Asset)).Hash.ToLower()
-    if ($Expected -ne $Actual) { throw "checksum mismatch for $Asset" }
-    $Archive = Join-Path $Tmp $Asset
-  } elseif (-not $Version) { throw "-Archive requires -Version" }
-  Invoke-LegacyMigration
-  $Dest = Join-Path $NodeHome $Version
-  New-Item -ItemType Directory -Force -Path $Dest, $BinDir | Out-Null
-  Expand-Archive -Path $Archive -DestinationPath $Dest -Force
-  Copy-Item (Join-Path $Dest "forge614-$NodeName.exe") $Launcher -Force
-  Set-Content -Path (Join-Path $NodeHome ".active-version") -Value $Version
-  & $Launcher --version | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "installed binary does not run" }
-  Write-Host "installed forge614-$NodeName $Version at $Dest"
-} finally { Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue }
+  [System.IO.Directory]::CreateDirectory($TemporaryDirectory) | Out-Null
+  [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+  if ($Tag -eq "latest") {
+    if ($TestBase) { $ApiUrl = "$Base/repos/$Repo/releases/latest" }
+    else { $ApiUrl = "https://api.github.com/repos/$Repo/releases/latest" }
+    $Release = Invoke-RestMethod -Uri $ApiUrl -Headers @{ Accept = "application/vnd.github+json" } -UseBasicParsing
+    $Tag = [string]$Release.tag_name
+  }
+  if (-not $Tag.StartsWith("v")) { $Tag = "v$Tag" }
+  if ($TestBase) { $DownloadBase = "$Base/repos/$Repo/releases/download/$([System.Uri]::EscapeDataString($Tag))" }
+  else { $DownloadBase = "$Base/download/$([System.Uri]::EscapeDataString($Tag))" }
+  $VersionTag = $Tag.TrimStart("v")
+  if ($VersionTag -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') { [Console]::Error.WriteLine("invalid version tag"); exit 64 }
+  foreach ($Name in @("install.mjs", "forge614.node.json", "SHA256SUMS")) {
+    $Destination = Join-Path $TemporaryDirectory $Name
+    Invoke-WebRequest -Uri "$DownloadBase/$Name" -OutFile $Destination -UseBasicParsing
+  }
+  foreach ($Name in @("install.mjs", "forge614.node.json")) {
+    $Matches = @(Get-Content -LiteralPath (Join-Path $TemporaryDirectory "SHA256SUMS") | Where-Object { $_ -match "^([0-9a-f]{64})  $([regex]::Escape($Name))$" })
+    if ($Matches.Count -ne 1) { throw "invalid SHA256SUMS entry: $Name" }
+    $Expected = $Matches[0].Substring(0, 64)
+    $Actual = Get-Sha256 -Path (Join-Path $TemporaryDirectory $Name)
+    if ($Expected -ne $Actual) { throw "SHA-256 mismatch: $Name" }
+  }
+  $env:FORGE614_INSTALL_REPOSITORY = $Repo
+  $env:FORGE614_INSTALL_NODE = $NodeName
+  & $NodeCommand.Source (Join-Path $TemporaryDirectory "install.mjs") @InstallerArgs
+  $InstallerExitCode = $LASTEXITCODE
+  exit $InstallerExitCode
+} catch {
+  [Console]::Error.WriteLine((Get-RootExceptionText -Exception $_.Exception))
+  exit 66
+} finally {
+  if ([System.IO.Directory]::Exists($TemporaryDirectory)) { Remove-Item -LiteralPath $TemporaryDirectory -Recurse -Force -ErrorAction SilentlyContinue }
+}

@@ -11,8 +11,12 @@ export const SENTINEL_VERSION: string = PackageVersion.parse(packageJson).versio
 
 // STANDARD §4: `--version` is always available and never blocking. Every
 // CLI calls this first, before any other argument parsing.
-export function printVersionIfRequested(argv: string[]): boolean {
+export function printVersionIfRequested(argv: string[], textByDefault = false): boolean {
   if (!argv.includes("--version")) return false;
+  if (textByDefault && !argv.includes("--json")) {
+    process.stdout.write(`${PRODUCT_NAME} ${SENTINEL_VERSION}\n`);
+    return true;
+  }
   printJson({ schemaVersion: 1, name: PRODUCT_NAME, version: SENTINEL_VERSION });
   return true;
 }

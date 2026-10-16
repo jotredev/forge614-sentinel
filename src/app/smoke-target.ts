@@ -5,7 +5,6 @@ import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { binaryName, type Exec, type Target } from "./build-target";
 
-const VersionEnvelope = z.object({ schemaVersion: z.literal(1), name: z.literal("forge614-sentinel"), version: z.string() }).strict();
 const Verdict = z.object({ schemaVersion: z.literal(1), verdict: z.enum(["pass", "caution", "fail"]) }).passthrough();
 
 export type SmokeTargetResult = { ok: true; target: Target; version: string; steps: string[] } | { ok: false; code: "SMOKE_FAILED"; error: string };
@@ -28,9 +27,9 @@ export function smokeTarget(options: { root: string; target: Target; outDir: str
   const fail = (error: string): SmokeTargetResult => ({ ok: false, code: "SMOKE_FAILED", error });
 
   const version = options.exec([binary, "--version"]);
-  const envelope = version.exitCode === 0 ? parseJson(VersionEnvelope, version.stdout) : null;
-  if (envelope === null) return fail(`--version failed (exit ${version.exitCode}): ${version.stderr.trim()}`);
-  if (envelope.version !== options.expectedVersion) return fail(`--version reports ${envelope.version}, package.json says ${options.expectedVersion}`);
+  const reportedVersion = version.exitCode === 0 ? /^forge614-sentinel (\d+\.\d+\.\d+)\s*$/.exec(version.stdout)?.[1] : undefined;
+  if (reportedVersion === undefined) return fail(`--version failed (exit ${version.exitCode}): ${version.stderr.trim()}`);
+  if (reportedVersion !== options.expectedVersion) return fail(`--version reports ${reportedVersion}, package.json says ${options.expectedVersion}`);
   steps.push("--version");
 
   const help = options.exec([binary, "--help"]);
@@ -41,7 +40,7 @@ export function smokeTarget(options: { root: string; target: Target; outDir: str
   try {
     const check = options.exec([binary, "check", "--repo", resolve(options.root, "fixtures/pass-node"), "--json"], {
       cwd: options.root,
-      env: { FORGE614_HOME: home, FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(resolve(options.root, "fixtures/standard")).href },
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_SENTINEL_RELEASE_BASE: pathToFileURL(resolve(options.root, "fixtures/standard")).href },
     });
     const report = parseJson(Verdict, check.stdout);
     if (check.exitCode !== 0 || report === null || report.verdict !== "pass") return fail(`check on fixtures/pass-node: exit ${check.exitCode}, verdict ${report?.verdict ?? "?"}: ${check.stderr.trim()}`);
@@ -49,5 +48,5 @@ export function smokeTarget(options: { root: string; target: Target; outDir: str
   } finally {
     rmSync(home, { recursive: true, force: true });
   }
-  return { ok: true, target: options.target, version: envelope.version, steps };
+  return { ok: true, target: options.target, version: reportedVersion, steps };
 }

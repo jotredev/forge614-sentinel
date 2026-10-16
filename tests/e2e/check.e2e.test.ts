@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { run } from "../../src/infrastructure/process";
 import { CheckReportSchema, type CheckReport } from "../../src/modules/report";
+import { SENTINEL_VERSION } from "../../src/interfaces/cli/version";
 import { writeFakeRelease } from "../helpers/fake-release";
 import { builtBinary } from "./binary";
 
@@ -14,7 +15,8 @@ const BASE = pathToFileURL(join(FIXTURES, "standard")).href;
 let bin = "";
 
 function sentinel(args: string[], env: Record<string, string> = {}) {
-  return run([bin, ...args], { cwd: REPO_ROOT, env: { FORGE614_HOME: mkdtempSync(join(tmpdir(), "sentinel-e2e-home-")), FORGE614_SENTINEL_RELEASE_BASE: BASE, ...env }, timeoutMs: 60_000 });
+  const home = mkdtempSync(join(tmpdir(), "sentinel-e2e-home-"));
+  return run([bin, ...args], { cwd: REPO_ROOT, env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_SENTINEL_RELEASE_BASE: BASE, ...env }, timeoutMs: 60_000 });
 }
 
 function report(stdout: string): CheckReport {
@@ -29,7 +31,9 @@ describe("forge614-sentinel (compiled binary)", () => {
   test("--version and --help", () => {
     const v = sentinel(["--version"]);
     expect(v.exitCode).toBe(0);
-    expect(JSON.parse(v.stdout.trim())).toMatchObject({ schemaVersion: 1, name: "forge614-sentinel" });
+    expect(v.stdout).toBe(`forge614-sentinel ${SENTINEL_VERSION}\n`);
+    const json = sentinel(["--version", "--json"]);
+    expect(JSON.parse(json.stdout.trim())).toMatchObject({ schemaVersion: 1, name: "forge614-sentinel", version: SENTINEL_VERSION });
     expect(sentinel(["--help"]).exitCode).toBe(0);
   });
 
