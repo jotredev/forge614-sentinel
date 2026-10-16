@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { cleanupStaleWindowsLaunchers, runInstallerGate, updateSentinel, uninstallSentinel } from "./installer-actions";
+import { cleanupStaleWindowsLaunchers, runInstallerGate, sameWindowsPath, updateSentinel, uninstallSentinel } from "./installer-actions";
 import { updateMain } from "../interfaces/cli/update";
 import { uninstallMain } from "../interfaces/cli/uninstall";
 
@@ -227,6 +227,17 @@ test("Windows update recognizes a process executable path that resolves to the i
     } as Parameters<typeof runInstallerGate>[1]);
     expect(readFileSync(launcher, "utf8")).toBe("running launcher");
   });
+});
+
+/** If either Windows realpath lookup fails, matching uses both original paths. */
+test("Windows path comparison falls back to both original paths when one realpath fails", () => {
+  let calls = 0;
+  const resolvePath = (path: string): string => {
+    calls += 1;
+    if (calls === 1) return "D:\\resolved-launcher.exe";
+    throw new Error(`cannot resolve ${path}`);
+  };
+  expect(sameWindowsPath("C:\\Sentinel.exe", "c:\\sentinel.exe", resolvePath)).toBe(true);
 });
 
 /** A successful no-op Windows update restores the parked launcher when no replacement was written. */
