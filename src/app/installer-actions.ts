@@ -305,9 +305,8 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     writeFileSync(installer, installerBytes, { mode: 0o700 });
     chmodSync(installer, 0o700);
     const processEnv = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
-    const flag = action === "update" ? (options.versionTag === undefined ? "--latest" : "--version") : "--uninstall";
     const command = platform === "win32" ? "powershell.exe" : "sh";
-    const actionArgs = options.versionTag === undefined ? [flag] : [flag, options.versionTag];
+    const actionArgs = action === "update" ? ["--version", tag] : ["--uninstall"];
     const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, ...actionArgs] : [installer, ...actionArgs];
     const parked = platform === "win32" ? parkRunningWindowsLauncher(action, env, options.processExecPath ?? process.execPath) : undefined;
     const updateParked = action === "update" ? parked : undefined;
