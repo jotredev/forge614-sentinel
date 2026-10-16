@@ -6,7 +6,7 @@ import type { Exec } from "./build-target";
 
 function fakeBinary(version: string, verdict: string): Exec {
   return (cmd) => {
-    if (cmd.includes("--version")) return { exitCode: 0, stdout: `${JSON.stringify({ schemaVersion: 1, name: "forge614-sentinel", version })}\n`, stderr: "" };
+    if (cmd.includes("--version")) return { exitCode: 0, stdout: `forge614-sentinel ${version}\n`, stderr: "" };
     if (cmd.includes("--help")) return { exitCode: 0, stdout: `${JSON.stringify({ schemaVersion: 1, usage: "x" })}\n`, stderr: "" };
     return { exitCode: verdict === "pass" ? 0 : 1, stdout: `${JSON.stringify({ schemaVersion: 1, verdict, checks: [] })}\n`, stderr: "" };
   };
@@ -30,4 +30,15 @@ test("the binary path is <outDir>/<target>/<binaryName>", () => {
   };
   smokeTarget({ root: repoRoot, target: "windows-x64", outDir: "/tmp/out", expectedVersion: "0.1.0", exec });
   expect(seen[0]).toBe(join("/tmp/out", "windows-x64", "forge614-sentinel.exe"));
+});
+
+test("the fixture check uses temporary HOME and FORGE614_HOME paths", () => {
+  let checkEnv: Record<string, string> | undefined;
+  const exec: Exec = (cmd, options) => {
+    if (cmd.includes("check")) checkEnv = options?.env;
+    return fakeBinary("0.1.0", "pass")(cmd);
+  };
+  smokeTarget({ root: repoRoot, target: "darwin-arm64", outDir: "/tmp/out", expectedVersion: "0.1.0", exec });
+  expect(checkEnv?.HOME).toBeDefined();
+  expect(checkEnv?.FORGE614_HOME?.startsWith(checkEnv?.HOME ?? "")).toBe(true);
 });

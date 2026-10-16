@@ -1,101 +1,71 @@
-#!/usr/bin/env bash
-# Forge614 node installer — rendered from forge614-ai/standard/templates/install.sh (standard 1.0.2).
-# Usage: install.sh [--version X.Y.Z] [--archive path.tar.gz] [--uninstall]
-set -euo pipefail
-
+#!/bin/sh
 NODE_NAME="sentinel"
 REPO="jotredev/forge614-sentinel"
-ASSET_PREFIX="forge614-sentinel"
-FORGE614_HOME="${FORGE614_HOME:-$HOME/.forge614}"
-NODE_HOME="$FORGE614_HOME/$NODE_NAME"
-BIN_DIR="$NODE_HOME/bin"
-LAUNCHER="$BIN_DIR/forge614-$NODE_NAME"
-
-log() { printf '%s\n' "$*" >&2; }
-die() { log "error: $*"; exit 1; }
-
-VERSION=""; ARCHIVE=""; UNINSTALL=0
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --version) VERSION="$2"; shift 2 ;;
-    --archive) ARCHIVE="$2"; shift 2 ;;
-    --uninstall) UNINSTALL=1; shift ;;
-    *) die "unknown argument: $1" ;;
-  esac
-done
-
-# Migración de instalaciones anteriores al estándar: instalación plana ($BIN_DIR/forge614-<node> como
-# binario real, sin prefijo versionado) y bloques PATH marcados en los perfiles de shell. Un nodo alineado
-# nunca edita PATH: solo forge614-ai crea el comando global. El perfil se respalda antes de tocarlo.
-MARK_BEGIN="# >>> forge614-$NODE_NAME PATH >>>"
-MARK_END="# <<< forge614-$NODE_NAME PATH <<<"
-remove_path_block() {
-  local file="$1"
-  [ -f "$file" ] || return 0
-  grep -qF "$MARK_BEGIN" "$file" || return 0
-  cp "$file" "$file.forge614-backup-$(date +%Y%m%d%H%M%S)"
-  awk -v b="$MARK_BEGIN" -v e="$MARK_END" '$0==b{skip=1;next} $0==e{skip=0;next} !skip' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
-  log "removed legacy PATH block from $file (backup kept next to it)"
+set -u
+locale=${FORGE614_LOCALE:-${FORGE614_SHELL_LOCALE:-es}}
+if ! command -v node >/dev/null 2>&1; then
+  if [ "${locale#en}" != "$locale" ]; then echo "Forge614 requires Node.js 22.19.0 or later to install. Install it with Homebrew: brew install node; on Linux, use your distribution's package manager or https://nodejs.org; on Windows, use winget install OpenJS.NodeJS.LTS or https://nodejs.org. Then run this installer again." >&2
+  else echo "Forge614 necesita Node.js 22.19.0 o posterior para instalarse. Instálalo con Homebrew: brew install node; en Linux, con el gestor de paquetes de tu distribución o desde https://nodejs.org; en Windows, con winget install OpenJS.NodeJS.LTS o desde https://nodejs.org. Después vuelve a ejecutar este instalador." >&2; fi
+  exit 65
+fi
+node -e 'const a=process.versions.node.split(".").map(Number); process.exit(a[0]>22||a[0]===22&&a[1]>=19?0:1)' || {
+  if [ "${locale#en}" != "$locale" ]; then echo "Forge614 requires Node.js 22.19.0 or later to install. Install it with Homebrew: brew install node; on Linux, use your distribution's package manager or https://nodejs.org; on Windows, use winget install OpenJS.NodeJS.LTS or https://nodejs.org. Then run this installer again." >&2
+  else echo "Forge614 necesita Node.js 22.19.0 o posterior para instalarse. Instálalo con Homebrew: brew install node; en Linux, con el gestor de paquetes de tu distribución o desde https://nodejs.org; en Windows, con winget install OpenJS.NodeJS.LTS o desde https://nodejs.org. Después vuelve a ejecutar este instalador." >&2; fi
+  exit 65
 }
-remove_legacy_path_blocks() {
-  local f
-  for f in "$HOME/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc" "$HOME/.profile" "$HOME/.config/fish/conf.d/forge614-$NODE_NAME.fish"; do remove_path_block "$f"; done
-  [ -f "$HOME/.config/fish/conf.d/forge614-$NODE_NAME.fish" ] && [ ! -s "$HOME/.config/fish/conf.d/forge614-$NODE_NAME.fish" ] && rm -f "$HOME/.config/fish/conf.d/forge614-$NODE_NAME.fish"
-  return 0
+tag=latest
+resolve_tag() {
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --version) [ "$#" -ge 2 ] && [ -n "$2" ] || return 64; printf '%s' "$2"; return 0 ;;
+      --latest) printf latest; return 0 ;;
+    esac
+    shift
+  done
+  printf latest
 }
-migrate_legacy_install() {
-  if [ -f "$LAUNCHER" ] && [ ! -L "$LAUNCHER" ]; then
-    local legacy="$NODE_HOME/legacy-$(date +%Y%m%d%H%M%S)"
-    mkdir -p "$legacy" && mv "$LAUNCHER" "$legacy/forge614-$NODE_NAME"
-    log "moved flat install to $legacy (kept until the new version verifies)"
+tag=$(resolve_tag "$@")
+tag_status=$?
+[ "$tag_status" -eq 0 ] || { echo "invalid value for --version" >&2; exit 64; }
+if [ "$tag" != latest ]; then
+  case "$tag" in v*) version=${tag#v} ;; *) version=$tag ;; esac
+  node -e 'process.exit(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(process.argv[1])?0:1)' "$version" || { echo "invalid version tag" >&2; exit 64; }
+fi
+base=${FORGE614_INSTALL_TEST_BASE_URL:-https://github.com/$REPO/releases}
+if [ -n "${FORGE614_INSTALL_TEST_BASE_URL:-}" ]; then
+  node -e 'const u=new URL(process.argv[1]);process.exit(u.protocol==="http:"&&(u.hostname==="127.0.0.1"||u.hostname==="[::1]")&&u.port&&!u.username&&!u.password&&u.pathname==="/"&&!u.search&&!u.hash?0:1)' "$base" || { echo "FORGE614_INSTALL_TEST_BASE_URL only accepts loopback HTTP." >&2; exit 64; }
+fi
+if [ "$tag" = latest ]; then
+  api=${FORGE614_INSTALL_TEST_BASE_URL:+$FORGE614_INSTALL_TEST_BASE_URL/repos/$REPO/releases/latest}
+  [ -n "$api" ] || api=https://api.github.com/repos/$REPO/releases/latest
+  if [ -n "${FORGE614_INSTALL_TEST_BASE_URL:-}" ]; then
+    tag=$(curl -fsSL "$api" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).tag_name))') || exit 66
+  else
+    tag=$(curl -fsSL --proto '=https' --tlsv1.2 "$api" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).tag_name))') || exit 66
   fi
-  remove_legacy_path_blocks
-}
-
-# Desinstalación simétrica: integraciones primero, luego los bloques PATH que una instalación plana
-# anterior pudo dejar en los perfiles, y por último solo el directorio del nodo (nunca ~/.forge614/).
-if [ "$UNINSTALL" = "1" ]; then
-  if [ -x "$LAUNCHER" ]; then "$LAUNCHER" uninstall --self || die "node refused to uninstall its integrations; nothing removed"; fi
-  remove_legacy_path_blocks
-  rm -rf "$NODE_HOME"
-  log "removed $NODE_HOME"
-  exit 0
 fi
-
-platform() {
-  local os arch
-  case "$(uname -s)" in Darwin) os=darwin ;; Linux) os=linux ;; *) die "unsupported OS $(uname -s)" ;; esac
-  case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=x64 ;; *) die "unsupported arch $(uname -m)" ;; esac
-  printf '%s-%s' "$os" "$arch"
+case "$tag" in v*) ;; *) tag=v$tag ;; esac
+version=${tag#v}
+node -e 'process.exit(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(process.argv[1])?0:1)' "$version" || { echo "invalid version tag" >&2; exit 64; }
+download_base=$base/download/$tag
+case "$base" in http://*) download_base=$base/repos/$REPO/releases/download/$tag ;; esac
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/.install-XXXXXX") || exit 66
+trap '[ -z "${tmp:-}" ] || rm -rf "$tmp"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM HUP
+fetch_file() {
+  if [ -n "${FORGE614_INSTALL_TEST_BASE_URL:-}" ]; then curl -fsSL "$1" -o "$2"
+  else curl -fsSL --proto '=https' --tlsv1.2 "$1" -o "$2"; fi
 }
-
-resolve_version() {
-  # Sin Node ni Python: la API de releases devuelve "tag_name": "vX.Y.Z"; se extrae con sed.
-  curl -fsSL --proto '=https' --tlsv1.2 -H 'Accept: application/vnd.github+json' "https://api.github.com/repos/$REPO/releases/latest" \
-    | sed -n 's/.*"tag_name": *"v\([0-9][0-9.]*\)".*/\1/p' | head -n1
-}
-
-TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-PLATFORM="$(platform)"
-if [ -z "$ARCHIVE" ]; then
-  [ -n "$VERSION" ] || VERSION="$(resolve_version)"
-  [ -n "$VERSION" ] || die "could not resolve latest version"
-  BASE="https://github.com/$REPO/releases/download/v$VERSION"
-  ASSET="$ASSET_PREFIX-$PLATFORM.tar.gz"
-  curl -fsSL --proto '=https' --tlsv1.2 -o "$TMP/$ASSET" "$BASE/$ASSET"
-  curl -fsSL --proto '=https' --tlsv1.2 -o "$TMP/SHA256SUMS" "$BASE/SHA256SUMS"
-  ( cd "$TMP" && grep " $ASSET\$" SHA256SUMS | sha256sum -c - >/dev/null 2>&1 || shasum -a 256 -c <(grep " $ASSET\$" SHA256SUMS) >/dev/null ) || die "checksum mismatch for $ASSET"
-  ARCHIVE="$TMP/$ASSET"
-else
-  [ -n "$VERSION" ] || die "--archive requires --version"
-fi
-
-migrate_legacy_install
-DEST="$NODE_HOME/$VERSION"
-mkdir -p "$DEST" "$BIN_DIR"
-tar -xzf "$ARCHIVE" -C "$DEST"
-chmod 0755 "$DEST/forge614-$NODE_NAME"
-ln -sfn "$DEST/forge614-$NODE_NAME" "$LAUNCHER"
-printf '%s\n' "$VERSION" > "$NODE_HOME/.active-version"
-"$LAUNCHER" --version >/dev/null || die "installed binary does not run"
-log "installed forge614-$NODE_NAME $VERSION at $DEST (launcher: $LAUNCHER)"
+for file in install.mjs forge614.node.json SHA256SUMS; do fetch_file "$download_base/$file" "$tmp/$file" || exit 66; done
+for file in install.mjs forge614.node.json; do
+  expected=$(awk -v name="$file" '$2==name{print $1}' "$tmp/SHA256SUMS")
+  [ "${#expected}" -eq 64 ] || { echo "invalid SHA256SUMS entry: $file" >&2; exit 66; }
+  if command -v shasum >/dev/null 2>&1; then actual=$(shasum -a 256 "$tmp/$file" | awk '{print $1}')
+  elif command -v sha256sum >/dev/null 2>&1; then actual=$(sha256sum "$tmp/$file" | awk '{print $1}')
+  else echo "SHA-256 utility is required." >&2; exit 65; fi
+  [ "$actual" = "$expected" ] || { echo "SHA-256 mismatch: $file" >&2; exit 66; }
+done
+FORGE614_INSTALL_REPOSITORY=$REPO FORGE614_INSTALL_NODE=$NODE_NAME node "$tmp/install.mjs" "$@"
+status=$?
+exit "$status"
