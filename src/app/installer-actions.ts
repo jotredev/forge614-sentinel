@@ -1,6 +1,8 @@
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync, writeFileSync, type Dirent } from "node:fs";
+import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, win32 } from "node:path";
 import { runCommand } from "./run-command";
 
 const REPOSITORY = "jotredev/forge614-sentinel";
@@ -25,6 +27,10 @@ export interface InstallerActionOptions {
   fetcher?: typeof fetch;
   /** Process runner used to execute the downloaded gatekeeper. */
   run?: InstallerProcess;
+  /** Executable path of the running Sentinel process; injectable for platform tests. */
+  processExecPath?: string;
+  /** Schedule deletion of an executable that Windows cannot delete while it is running. */
+  scheduleDelete?: (command: string, args: string[]) => void;
 }
 
 /** Result returned by a successful self-update. */
@@ -81,8 +87,57 @@ function installerUrl(platform: string, base: string | undefined): string {
 
 /** Resolve the installed Sentinel launcher path for the current operating system. */
 function installedLauncher(env: Record<string, string | undefined>, platform: string): string {
-  const forgeHome = environmentValue(env, "FORGE614_HOME") || join(environmentValue(env, "HOME") || environmentValue(env, "USERPROFILE") || homedir(), ".forge614");
+  const forgeHome = installationHome(env);
   return join(forgeHome, "sentinel", "bin", `forge614-sentinel${platform === "win32" ? ".exe" : ""}`);
+}
+
+/** Resolve the configured Forge614 home used for the cache and installed node. */
+function installationHome(env: Record<string, string | undefined>): string {
+  return environmentValue(env, "FORGE614_HOME") || join(environmentValue(env, "HOME") || environmentValue(env, "USERPROFILE") || homedir(), ".forge614");
+}
+
+/** Compare Windows paths using Windows separators and case-insensitive matching. */
+function sameWindowsPath(left: string, right: string): boolean {
+  return win32.normalize(left).replaceAll("/", "\\").toLocaleLowerCase("en-US") === win32.normalize(right).replaceAll("/", "\\").toLocaleLowerCase("en-US");
+}
+
+/** Park the active installed launcher so the Windows installer can replace or remove its node directory. */
+function parkRunningWindowsLauncher(action: InstallerAction, env: Record<string, string | undefined>, processExecPath: string): { original: string; parked: string } | undefined {
+  const original = installedLauncher(env, "win32");
+  if (!sameWindowsPath(processExecPath, original)) return undefined;
+  const parked = action === "update"
+    ? `${original}.old-${randomUUID()}`
+    : join(installationHome(env), `.forge614-sentinel-old-${randomUUID()}.exe`);
+  renameSync(original, parked);
+  return { original, parked };
+}
+
+/** Best-effort cleanup for old launchers left beside the Windows installation. */
+export function cleanupStaleWindowsLaunchers(options: { env?: Record<string, string | undefined>; platform?: string } = {}): void {
+  if ((options.platform ?? process.platform) !== "win32") return;
+  const directory = dirname(installedLauncher(options.env ?? process.env, "win32"));
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile() || !/^forge614-sentinel\.exe\.old-.+$/i.test(entry.name)) continue;
+    try { rmSync(join(directory, entry.name), { force: true }); } catch { /* stale launcher cleanup is best-effort */ }
+  }
+}
+
+/** Schedule deletion of a parked Windows executable after its process has exited. */
+function scheduleWindowsLauncherRemoval(file: string, scheduler: (command: string, args: string[]) => void): void {
+  const command = `timeout /t 3 /nobreak >nul & del /f /q "${file.replaceAll('"', '""')}"`;
+  scheduler("cmd.exe", ["/d", "/c", command]);
+}
+
+/** Start the detached Windows command that removes the parked executable. */
+function spawnWindowsLauncherRemoval(command: string, args: string[]): void {
+  const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true });
+  child.unref();
 }
 
 /** Read the version from the installed launcher, returning the supplied fallback when no launcher is available. */
@@ -110,10 +165,24 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     const flag = action === "update" ? "--latest" : "--uninstall";
     const command = platform === "win32" ? "powershell.exe" : "bash";
     const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, flag] : [installer, flag];
-    const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
-    if (result.exitCode !== 0) {
-      const detail = result.stderr.trim();
-      throw new InstallerActionError(detail || `The Forge614 Sentinel installer exited with code ${result.exitCode}.`, result.exitCode);
+    const parked = platform === "win32" ? parkRunningWindowsLauncher(action, env, options.processExecPath ?? process.execPath) : undefined;
+    try {
+      const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
+      if (result.exitCode !== 0) {
+        const detail = result.stderr.trim();
+        throw new InstallerActionError(detail || `The Forge614 Sentinel installer exited with code ${result.exitCode}.`, result.exitCode);
+      }
+    } catch (error) {
+      if (parked && !existsSync(parked.original) && existsSync(parked.parked)) {
+        try {
+          mkdirSync(dirname(parked.original), { recursive: true });
+          renameSync(parked.parked, parked.original);
+        } catch { /* preserve the installer error if rollback is unavailable */ }
+      }
+      throw error;
+    }
+    if (parked && action === "uninstall") {
+      try { scheduleWindowsLauncherRemoval(parked.parked, options.scheduleDelete ?? spawnWindowsLauncherRemoval); } catch { /* cleanup is best-effort */ }
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });

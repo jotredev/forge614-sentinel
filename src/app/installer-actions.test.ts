@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { runInstallerGate, updateSentinel, uninstallSentinel } from "./installer-actions";
+import { dirname, join } from "node:path";
+import { cleanupStaleWindowsLaunchers, runInstallerGate, updateSentinel, uninstallSentinel } from "./installer-actions";
 import { updateMain } from "../interfaces/cli/update";
 import { uninstallMain } from "../interfaces/cli/uninstall";
 
@@ -95,6 +95,93 @@ test("Windows selects the PowerShell gatekeeper and forwards --latest", async ()
     expect(call?.command).toBe("powershell.exe");
     expect(call?.args).toEqual(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", expect.any(String), "--latest"]);
   });
+});
+
+/** Windows update must move the running launcher before the installer replaces it. */
+test("Windows update parks the running launcher beside itself before invoking the gate", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const launcher = join(home, ".forge614", "sentinel", "bin", "forge614-sentinel.exe");
+    mkdirSync(dirname(launcher), { recursive: true });
+    writeFileSync(launcher, "running launcher");
+    await runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "win32",
+      processExecPath: launcher,
+      run: () => {
+        expect(existsSync(launcher)).toBe(false);
+        expect(readdirSync(dirname(launcher)).some((name) => name.startsWith("forge614-sentinel.exe.old-"))).toBe(true);
+        writeFileSync(launcher, "replacement launcher");
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    } as Parameters<typeof runInstallerGate>[1]);
+    expect(readFileSync(launcher, "utf8")).toBe("replacement launcher");
+    expect(readdirSync(dirname(launcher)).some((name) => name.startsWith("forge614-sentinel.exe.old-"))).toBe(true);
+  });
+});
+
+/** Windows uninstall must move the running executable outside the node folder before removal. */
+test("Windows uninstall moves its launcher outside the node tree and schedules delayed deletion", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const forgeHome = join(home, ".forge614");
+    const launcher = join(forgeHome, "sentinel", "bin", "forge614-sentinel.exe");
+    mkdirSync(dirname(launcher), { recursive: true });
+    writeFileSync(launcher, "running launcher");
+    let scheduled: { command: string; args: string[] } | undefined;
+    await runInstallerGate("uninstall", {
+      env: { HOME: home, FORGE614_HOME: forgeHome, FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "win32",
+      processExecPath: launcher,
+      scheduleDelete: (command: string, args: string[]) => { scheduled = { command, args }; },
+      run: () => {
+        expect(existsSync(launcher)).toBe(false);
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    } as Parameters<typeof runInstallerGate>[1]);
+    expect(existsSync(launcher)).toBe(false);
+    expect(scheduled?.command).toBe("cmd.exe");
+    expect(scheduled?.args.slice(0, 2)).toEqual(["/d", "/c"]);
+    expect(scheduled?.args[2]).toContain("timeout /t");
+    expect(scheduled?.args[2]).toContain("del /f /q");
+    const parked = readdirSync(forgeHome).find((name) => /^\.forge614-sentinel-old-.*\.exe$/i.test(name));
+    expect(parked).toBeDefined();
+    expect(existsSync(join(forgeHome, parked ?? ""))).toBe(true);
+  });
+});
+
+/** A failed Windows uninstall must restore the launcher and avoid scheduling deletion. */
+test("Windows uninstall restores its launcher when the gate fails", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const forgeHome = join(home, ".forge614");
+    const launcher = join(forgeHome, "sentinel", "bin", "forge614-sentinel.exe");
+    mkdirSync(dirname(launcher), { recursive: true });
+    writeFileSync(launcher, "running launcher");
+    let scheduled = false;
+    await expect(runInstallerGate("uninstall", {
+      env: { HOME: home, FORGE614_HOME: forgeHome, FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "win32",
+      processExecPath: launcher,
+      scheduleDelete: () => { scheduled = true; },
+      run: () => ({ exitCode: 1, stdout: "", stderr: "failed" }),
+    } as Parameters<typeof runInstallerGate>[1])).rejects.toMatchObject({ exitCode: 1 });
+    expect(readFileSync(launcher, "utf8")).toBe("running launcher");
+    expect(scheduled).toBe(false);
+  });
+});
+
+/** Startup cleanup removes old parked Windows launchers without touching other files. */
+test("Windows startup cleanup removes stale parked launchers best-effort", () => {
+  const home = mkdtempSync(join(tmpdir(), "sentinel-installer-cleanup-"));
+  const forgeHome = join(home, ".forge614");
+  const directory = join(forgeHome, "sentinel", "bin");
+  mkdirSync(directory, { recursive: true });
+  const stale = join(directory, "forge614-sentinel.exe.old-abc123");
+  const current = join(directory, "forge614-sentinel.exe");
+  writeFileSync(stale, "old");
+  writeFileSync(current, "current");
+  cleanupStaleWindowsLaunchers({ env: { HOME: home, FORGE614_HOME: forgeHome }, platform: "win32" });
+  expect(existsSync(stale)).toBe(false);
+  expect(existsSync(current)).toBe(true);
+  rmSync(home, { recursive: true, force: true });
 });
 
 test("an interrupted uninstall gate preserves exit code 130", async () => {
