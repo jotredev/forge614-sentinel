@@ -430,6 +430,28 @@ test("interactive uninstall cancellation returns 130 without downloading the gat
   });
 });
 
+/** Ctrl+C and Ctrl+D confirmation aborts are cancellations, not CLI failures. */
+test("interactive uninstall maps AbortError to cancellation without output or installer requests", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await uninstallMain([], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+    }, {
+      writeLine: (line) => stdout.push(line),
+      writeError: (line) => stderr.push(line),
+      isTerminal: () => true,
+      confirm: async () => { throw new DOMException("prompt aborted", "AbortError"); },
+    });
+    expect(code).toBe(130);
+    expect(stdout).toEqual([]);
+    expect(stderr).toEqual([]);
+    expect(requests).toEqual([]);
+  });
+});
+
 /** Interactive uninstall proceeds only after a positive Spanish or English confirmation. */
 test("interactive uninstall accepts y and invokes the published gate", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
