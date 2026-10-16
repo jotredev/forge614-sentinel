@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdtempSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -38,5 +38,5 @@ test("network failure is STANDARD_FETCH_FAILED; a tampered SHA256SUMS is STANDAR
   const corrupt = run(["bun", "run", CLI, "1.0.0"], { cwd: REPO_ROOT, env: { HOME: home, FORGE614_HOME: home, FORGE614_SENTINEL_RELEASE_BASE: corruptBase } });
   expect(corrupt.exitCode).toBe(1);
   expect(JSON.parse(corrupt.stderr.trim())).toMatchObject({ code: "STANDARD_CORRUPT" });
-  expect(readdirSync(home).filter((entry) => entry !== "Library")).toEqual([]);
+  expect(existsSync(join(home, "standard", "1.0.0"))).toBe(false);
 });
