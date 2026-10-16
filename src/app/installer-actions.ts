@@ -140,6 +140,15 @@ function parkRunningWindowsLauncher(action: InstallerAction, env: Record<string,
   return { original, parked };
 }
 
+/** Restore an update's parked launcher only when the installer did not create a replacement. */
+function restoreParkedWindowsLauncher(parked: { original: string; parked: string } | undefined): void {
+  if (!parked || existsSync(parked.original) || !existsSync(parked.parked)) return;
+  try {
+    mkdirSync(dirname(parked.original), { recursive: true });
+    renameSync(parked.parked, parked.original);
+  } catch { /* preserve the gatekeeper result if rollback is unavailable */ }
+}
+
 /** Best-effort cleanup for old launchers left beside the Windows installation. */
 export function cleanupStaleWindowsLaunchers(options: { env?: Record<string, string | undefined>; platform?: string } = {}): void {
   if ((options.platform ?? process.platform) !== "win32") return;
@@ -207,6 +216,10 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     const actionArgs = options.versionTag === undefined ? [flag] : [flag, options.versionTag];
     const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, ...actionArgs] : [installer, ...actionArgs];
     const parked = platform === "win32" ? parkRunningWindowsLauncher(action, env, options.processExecPath ?? process.execPath) : undefined;
+    const updateParked = action === "update" ? parked : undefined;
+    const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", ...(platform === "win32" ? ["SIGBREAK" as const] : [])];
+    const restoreOnSignal = () => restoreParkedWindowsLauncher(updateParked);
+    if (updateParked) for (const signal of signals) process.on(signal, restoreOnSignal);
     try {
       const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
       if (result.exitCode !== 0) {
@@ -214,13 +227,13 @@ export async function runInstallerGate(action: InstallerAction, options: Install
         throw new InstallerActionError(detail || `The Forge614 Sentinel installer exited with code ${result.exitCode}.`, result.exitCode);
       }
     } catch (error) {
-      if (parked && !existsSync(parked.original) && existsSync(parked.parked)) {
-        try {
-          mkdirSync(dirname(parked.original), { recursive: true });
-          renameSync(parked.parked, parked.original);
-        } catch { /* preserve the installer error if rollback is unavailable */ }
-      }
+      if (action === "uninstall") restoreParkedWindowsLauncher(parked);
       throw error;
+    } finally {
+      if (updateParked) {
+        for (const signal of signals) process.off(signal, restoreOnSignal);
+        restoreParkedWindowsLauncher(updateParked);
+      }
     }
     if (parked && action === "uninstall") {
       try { scheduleWindowsLauncherRemoval(parked.parked, options.scheduleDelete ?? spawnWindowsLauncherRemoval); } catch { /* cleanup is best-effort */ }

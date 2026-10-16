@@ -184,6 +184,42 @@ test("Windows update parks the running launcher beside itself before invoking th
   });
 });
 
+/** A successful no-op Windows update restores the parked launcher when no replacement was written. */
+test("Windows update restores the launcher after a successful gate that writes no replacement", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const launcher = join(home, ".forge614", "sentinel", "bin", "forge614-sentinel.exe");
+    mkdirSync(dirname(launcher), { recursive: true });
+    writeFileSync(launcher, "running launcher");
+    await runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "win32",
+      processExecPath: launcher,
+      run: () => ({ exitCode: 0, stdout: "already up to date", stderr: "" }),
+    } as Parameters<typeof runInstallerGate>[1]);
+    expect(readFileSync(launcher, "utf8")).toBe("running launcher");
+    expect(readdirSync(dirname(launcher)).some((name) => name.startsWith("forge614-sentinel.exe.old-"))).toBe(false);
+  });
+});
+
+/** A Windows update signal restores the launcher while the gatekeeper is still running. */
+test("Windows update restores its launcher when interrupted while the gate runs", async () => {
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const launcher = join(home, ".forge614", "sentinel", "bin", "forge614-sentinel.exe");
+    mkdirSync(dirname(launcher), { recursive: true });
+    writeFileSync(launcher, "running launcher");
+    await runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+      platform: "win32",
+      processExecPath: launcher,
+      run: () => {
+        process.emit("SIGTERM");
+        expect(readFileSync(launcher, "utf8")).toBe("running launcher");
+        return { exitCode: 0, stdout: "interrupted", stderr: "" };
+      },
+    } as Parameters<typeof runInstallerGate>[1]);
+  });
+});
+
 /** Windows uninstall must move the running executable outside the node folder before removal. */
 test("Windows uninstall moves its launcher outside the node tree and schedules delayed deletion", async () => {
   await withGateServer(async (baseUrl, _requests, home) => {
