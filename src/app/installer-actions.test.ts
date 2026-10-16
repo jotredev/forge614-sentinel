@@ -358,6 +358,81 @@ test("uninstall --json reports removal after invoking the local published gate",
   });
 });
 
+/** A terminal uninstall cancellation exits 130 without contacting the installer. */
+test("interactive uninstall cancellation returns 130 without downloading the gate", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    const prompts: string[] = [];
+    const code = await uninstallMain([], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+    }, {
+      writeLine: () => {},
+      writeError: () => {},
+      isTerminal: () => true,
+      confirm: async (prompt: string) => { prompts.push(prompt); return "n"; },
+    } as Parameters<typeof uninstallMain>[2]);
+    expect(code).toBe(130);
+    expect(prompts).toEqual(["¿Desinstalar forge614-sentinel? [s/N]"]);
+    expect(requests).toEqual([]);
+  });
+});
+
+/** Interactive uninstall proceeds only after a positive Spanish or English confirmation. */
+test("interactive uninstall accepts y and invokes the published gate", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    const prompts: string[] = [];
+    const code = await uninstallMain([], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+    }, {
+      writeLine: () => {},
+      writeError: () => {},
+      isTerminal: () => true,
+      confirm: async (prompt: string) => { prompts.push(prompt); return "y"; },
+    } as Parameters<typeof uninstallMain>[2]);
+    expect(code).toBe(0);
+    expect(prompts).toEqual(["¿Desinstalar forge614-sentinel? [s/N]"]);
+    expect(requests).toEqual(latestGateRequests("install.sh"));
+  });
+});
+
+/** JSON uninstall stays non-interactive even when the process has a terminal. */
+test("JSON uninstall does not request terminal confirmation", async () => {
+  await withGateServer(async (baseUrl, requests, home) => {
+    let prompts = 0;
+    const code = await uninstallMain(["--json"], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+    }, {
+      writeLine: () => {},
+      writeError: () => {},
+      isTerminal: () => true,
+      confirm: async () => { prompts += 1; return "n"; },
+    } as Parameters<typeof uninstallMain>[2]);
+    expect(code).toBe(0);
+    expect(prompts).toBe(0);
+    expect(requests).toEqual(latestGateRequests("install.sh"));
+  });
+});
+
+/** `uninstall --self` never asks for confirmation, even with a terminal. */
+test("uninstall --self never requests terminal confirmation", async () => {
+  let prompts = 0;
+  const stdout: string[] = [];
+  const code = await uninstallMain(["--self"], {}, {
+    writeLine: (line) => stdout.push(line),
+    writeError: () => {},
+    isTerminal: () => true,
+    confirm: async () => { prompts += 1; return "n"; },
+  });
+  expect(code).toBe(0);
+  expect(prompts).toBe(0);
+  expect(stdout[0]).toContain("no tiene integraciones");
+});
+
 /** The uninstall error preserves a localized gatekeeper message without exposing its temporary trace. */
 test("uninstall --json includes the first non-empty gatekeeper error line only", async () => {
   const message = "Forge614 requires Node.js 22.19.0 or later to install.";

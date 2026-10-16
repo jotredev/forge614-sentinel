@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { createInterface } from "node:readline/promises";
 import { InstallerActionError, uninstallSentinel } from "../../app/installer-actions";
 import { issuesOf, parseMixed } from "./args";
 import { printVersionIfRequested } from "./version";
@@ -12,6 +13,10 @@ export interface UninstallCommandIO {
   writeLine(line: string): void;
   /** Write one structured error line. */
   writeError(line: string): void;
+  /** Whether the caller is attached to an interactive terminal. */
+  isTerminal?(): boolean;
+  /** Ask the confirmation question and return the user's response. */
+  confirm?(prompt: string): Promise<string>;
 }
 
 /** Parse and run `uninstall`, keeping `--self` local because Sentinel has no assistant integrations. */
@@ -35,6 +40,16 @@ export async function uninstallMain(
     if (parsed.data.json) io.writeLine(JSON.stringify({ schemaVersion: 1, result: { integrationsRemoved: true } }));
     else io.writeLine("forge614-sentinel no tiene integraciones de asistentes que retirar.");
     return 0;
+  }
+  const isTerminal = io.isTerminal?.() ?? process.stdin.isTTY === true;
+  if (isTerminal && !parsed.data.json) {
+    const prompt = "¿Desinstalar forge614-sentinel? [s/N]";
+    const confirm = io.confirm ?? (async (message: string) => {
+      const terminal = createInterface({ input: process.stdin, output: process.stdout });
+      try { return await terminal.question(message); } finally { terminal.close(); }
+    });
+    const answer = (await confirm(prompt)).trim().toLocaleLowerCase("en-US");
+    if (answer !== "s" && answer !== "y") return 130;
   }
   try {
     await uninstallSentinel({ env });
