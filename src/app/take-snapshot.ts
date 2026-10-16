@@ -14,6 +14,7 @@ export function takeSnapshot(root: string): RepoSnapshot {
     facts: {
       gitAvailable: git.available,
       gitTags: git.tags,
+      gitRefName: process.env.GITHUB_REF_NAME,
       gitLogSubjects: git.logSubjects,
       executablePaths: git.executablePaths,
       skippedLargeFiles: tree.skippedLargeFiles,

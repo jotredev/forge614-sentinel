@@ -5,6 +5,8 @@
 export interface RepoFacts {
   readonly gitAvailable: boolean;
   readonly gitTags: readonly string[];
+  /** GitHub Actions tag name when a release workflow is running. */
+  readonly gitRefName: string | undefined;
   readonly gitLogSubjects: readonly string[];
   readonly executablePaths: readonly string[];
   readonly skippedLargeFiles: readonly string[];
@@ -20,6 +22,7 @@ export interface RepoSnapshot {
 export const EMPTY_FACTS: RepoFacts = {
   gitAvailable: false,
   gitTags: [],
+  gitRefName: undefined,
   gitLogSubjects: [],
   executablePaths: [],
   skippedLargeFiles: [],

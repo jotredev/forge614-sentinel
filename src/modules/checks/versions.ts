@@ -15,12 +15,11 @@ function readJson<T>(schema: z.ZodType<T>, raw: string): T | null {
   }
 }
 
-// spec §8.2 (ruling R29): exact equality of package.json.version, the
-// highest v* tag when the checkout has tags, and notion-map productVersion.
+// spec §8.2: package.json cannot lag the highest published v* tag; a new
+// package version may be prepared before its tag is created. A release
+// checkout must still match the tag pointing at HEAD.
 // A shallow CI clone (actions/checkout fetch-depth 1) carries no tags, so
-// pull requests compare package.json with notion-map only; the release
-// workflow runs on the pushed tag, which must then equal package.json.
-// `--version` is not executed in 0.2 (machine-contracts, 0.3).
+// pull requests compare package.json with notion-map only.
 export const versionsCheck: CheckDefinition = {
   id: "versions",
   appliesWhen: (snapshot) => has(snapshot, "package.json"),
@@ -43,8 +42,14 @@ export const versionsCheck: CheckDefinition = {
       for (const tag of snapshot.facts.gitTags) if (/^\d+\.\d+\.\d+$/.test(tag)) flag(`git tag '${tag}' looks like a version but must start with v`);
     }
     const highestTag = highestSemver(snapshot.facts.gitTags.filter((t) => /^v\d+\.\d+\.\d+$/.test(t)).map((t) => t.slice(1)));
-    if (highestTag !== undefined && pkgVersion !== undefined && SEMVER_PATTERN.test(pkgVersion) && pkgVersion !== highestTag) {
-      flag(`package.json version ${pkgVersion} vs highest tag v${highestTag}`);
+    if (highestTag !== undefined && pkgVersion !== undefined && SEMVER_PATTERN.test(pkgVersion)) {
+      if (highestSemver([pkgVersion, highestTag]) === highestTag && pkgVersion !== highestTag) {
+        flag(`package.json version ${pkgVersion} is behind highest tag v${highestTag}`);
+      }
+    }
+    const publishingTag = snapshot.facts.gitRefName;
+    if (publishingTag !== undefined && /^v\d+\.\d+\.\d+$/.test(publishingTag) && pkgVersion !== undefined && SEMVER_PATTERN.test(pkgVersion) && pkgVersion !== publishingTag.slice(1)) {
+      flag(`package.json version ${pkgVersion} vs publishing tag ${publishingTag}`);
     }
 
     const mapRaw = read(snapshot, "docs/notion-map.json");

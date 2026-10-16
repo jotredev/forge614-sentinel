@@ -22,14 +22,45 @@ test("fails when notion-map disagrees or the highest v* tag differs from package
   expect(r.verdict).toBe("fail");
   expect(r.evidence).toEqual(["git tags not available (not a git checkout)", "package.json version 0.2.0 vs docs/notion-map.json productVersion 0.1.0"]);
   const behind = versionsCheck.run(snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.1.0", "v0.2.0", "standard-v1.0.0"] }), params);
-  expect(behind.evidence).toEqual(["package.json version 0.1.0 vs highest tag v0.2.0"]);
+  expect(behind.evidence).toEqual(["package.json version 0.1.0 is behind highest tag v0.2.0"]);
 });
 
-test("the highest v* tag must equal package.json exactly (spec §8.2): equal passes, ahead fails too", () => {
+test("a package version equal to or ahead of the highest tag passes, but a lower version fails", () => {
   expect(versionsCheck.run(snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.1.0"] }), params).evidence).toEqual([]);
   const ahead = versionsCheck.run(snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.0.9"] }), params);
-  expect(ahead.verdict).toBe("fail");
-  expect(ahead.evidence).toEqual(["package.json version 0.1.0 vs highest tag v0.0.9"]);
+  expect(ahead.verdict).toBe("pass");
+  const behind = versionsCheck.run(snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.2.0"] }), params);
+  expect(behind.verdict).toBe("fail");
+  expect(behind.evidence).toEqual(["package.json version 0.1.0 is behind highest tag v0.2.0"]);
+});
+
+test("allows an untagged package version above the latest tag but rejects a version behind it", () => {
+  const newer = snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.1.0"] });
+  const newerFiles = new Map(newer.files);
+  newerFiles.set("package.json", JSON.stringify({ name: "fixture", version: "0.2.0" }));
+  newerFiles.set("docs/notion-map.json", JSON.stringify({ productVersion: "0.2.0" }));
+  expect(versionsCheck.run({ ...newer, files: newerFiles }, params).verdict).toBe("pass");
+
+  const older = snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.2.0"] });
+  expect(versionsCheck.run(older, params).evidence).toContain("package.json version 0.1.0 is behind highest tag v0.2.0");
+});
+
+test("requires package.json to match the version tag on the checked-out commit", () => {
+  const snapshot = snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.1.0"], gitRefName: "v0.2.0" });
+  const files = new Map(snapshot.files);
+  files.set("package.json", JSON.stringify({ name: "fixture", version: "0.3.0" }));
+  files.set("docs/notion-map.json", JSON.stringify({ productVersion: "0.3.0" }));
+  const r = versionsCheck.run({ ...snapshot, files }, testParams({ templates: new Map([["install.mjs", "template"]]) }));
+  expect(r.verdict).toBe("fail");
+  expect(r.evidence).toContain("package.json version 0.3.0 vs publishing tag v0.2.0");
+});
+
+test("a historical tag at HEAD does not count as the tag currently being published", () => {
+  const snapshot = snapshotFromDir("versions/pass", { gitAvailable: true, gitTags: ["v0.2.0"] });
+  const files = new Map(snapshot.files);
+  files.set("package.json", JSON.stringify({ name: "fixture", version: "0.2.1" }));
+  files.set("docs/notion-map.json", JSON.stringify({ productVersion: "0.2.1" }));
+  expect(versionsCheck.run({ ...snapshot, files }, params).verdict).toBe("pass");
 });
 
 test("a git checkout without v* tags (a shallow CI clone) compares package.json with notion-map only", () => {
