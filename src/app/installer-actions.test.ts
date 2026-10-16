@@ -7,16 +7,15 @@ import { updateMain } from "../interfaces/cli/update";
 import { uninstallMain } from "../interfaces/cli/uninstall";
 
 /** Run a test action against a loopback server and an isolated user home. */
-async function withGateServer<T>(action: (baseUrl: string, requests: string[], home: string) => Promise<T>): Promise<T> {
+async function withGateServer<T>(action: (baseUrl: string, requests: string[], home: string) => Promise<T>, installerScript = "#!/bin/sh\nexit 0\n"): Promise<T> {
   const requests: string[] = [];
-  const installer = "#!/bin/sh\nexit 0\n";
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     fetch(request) {
       const path = new URL(request.url).pathname;
       requests.push(path);
-      return path.endsWith("/install.sh") || path.endsWith("/install.ps1") ? new Response(installer) : new Response("missing", { status: 404 });
+      return path.endsWith("/install.sh") || path.endsWith("/install.ps1") ? new Response(installerScript) : new Response("missing", { status: 404 });
     },
   });
   const home = mkdtempSync(join(tmpdir(), "sentinel-installer-action-"));
@@ -220,6 +219,28 @@ test("update --json reports the result after invoking the local published gate",
   });
 });
 
+/** The update error preserves the gatekeeper's first useful line without exposing paths or traces. */
+test("update --json includes the first non-empty gatekeeper error line only", async () => {
+  const message = "Forge614 requires Node.js 22.19.0 or later to install.";
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await updateMain(["--json"], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+      FORGE614_LOCALE: "en",
+    }, { writeLine: (line) => stdout.push(line), writeError: (line) => stderr.push(line) });
+    expect(code).toBe(1);
+    expect(stdout).toEqual([]);
+    const error = JSON.parse(stderr[0] ?? "");
+    expect(error).toMatchObject({ schemaVersion: 1, code: "UPDATE_FAILED" });
+    expect(error.error).toContain(message);
+    expect(error.error).not.toContain(home);
+    expect(error.error).not.toContain("at file:");
+  }, `#!/bin/sh\necho >&2\necho '${message}' >&2\necho '    at file:///tmp/private/install.mjs' >&2\nexit 65\n`);
+});
+
 test("uninstall --json reports removal after invoking the local published gate", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
     const stdout: string[] = [];
@@ -231,4 +252,26 @@ test("uninstall --json reports removal after invoking the local published gate",
     expect(JSON.parse(stdout[0] ?? "")).toEqual({ schemaVersion: 1, result: { removed: true } });
     expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.sh"]);
   });
+});
+
+/** The uninstall error preserves a localized gatekeeper message without exposing its temporary trace. */
+test("uninstall --json includes the first non-empty gatekeeper error line only", async () => {
+  const message = "Forge614 requires Node.js 22.19.0 or later to install.";
+  await withGateServer(async (baseUrl, _requests, home) => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    const code = await uninstallMain(["--json"], {
+      HOME: home,
+      FORGE614_HOME: join(home, ".forge614"),
+      FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+      FORGE614_LOCALE: "en",
+    }, { writeLine: (line) => stdout.push(line), writeError: (line) => stderr.push(line) });
+    expect(code).toBe(1);
+    expect(stdout).toEqual([]);
+    const error = JSON.parse(stderr[0] ?? "");
+    expect(error).toMatchObject({ schemaVersion: 1, code: "UNINSTALL_FAILED" });
+    expect(error.error).toContain(message);
+    expect(error.error).not.toContain(home);
+    expect(error.error).not.toContain("at file:");
+  }, `#!/bin/sh\necho >&2\necho '${message}' >&2\necho '    at file:///tmp/private/install.mjs' >&2\nexit 65\n`);
 });

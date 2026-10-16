@@ -140,6 +140,12 @@ function spawnWindowsLauncherRemoval(command: string, args: string[]): void {
   child.unref();
 }
 
+/** Keep the first useful gatekeeper message while replacing absolute paths with a marker. */
+function firstSafeInstallerErrorLine(stderr: string): string | undefined {
+  const line = stderr.split(/\r?\n/).map((entry) => entry.trim()).find((entry) => entry.length > 0);
+  return line?.replace(/(?:[A-Za-z]:\\|\/)(?:[^\\/\s]+[\\/])*[^\\/\s]*/g, "<path>");
+}
+
 /** Read the version from the installed launcher, returning the supplied fallback when no launcher is available. */
 function readInstalledVersion(env: Record<string, string | undefined>, platform: string, fallback: string): string {
   const launcher = installedLauncher(env, platform);
@@ -169,7 +175,7 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     try {
       const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
       if (result.exitCode !== 0) {
-        const detail = result.stderr.trim();
+        const detail = firstSafeInstallerErrorLine(result.stderr);
         throw new InstallerActionError(detail || `The Forge614 Sentinel installer exited with code ${result.exitCode}.`, result.exitCode);
       }
     } catch (error) {

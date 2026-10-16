@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { updateSentinel } from "../../app/installer-actions";
+import { InstallerActionError, updateSentinel } from "../../app/installer-actions";
 import { issuesOf, parseMixed } from "./args";
 import { printVersionIfRequested, SENTINEL_VERSION } from "./version";
 
@@ -38,8 +38,9 @@ export async function updateMain(
       ? `forge614-sentinel se actualizó de ${result.previousVersion} a ${result.installedVersion}.`
       : `forge614-sentinel ya está al día (${result.installedVersion}).`);
     return 0;
-  } catch {
-    io.writeError(JSON.stringify({ schemaVersion: 1, code: "UPDATE_FAILED", error: "No se pudo actualizar Forge614 Sentinel." }));
+  } catch (error) {
+    const detail = error instanceof InstallerActionError ? error.message : "";
+    io.writeError(JSON.stringify({ schemaVersion: 1, code: "UPDATE_FAILED", error: `No se pudo actualizar Forge614 Sentinel.${detail ? ` ${detail}` : ""}` }));
     return 1;
   }
 }
