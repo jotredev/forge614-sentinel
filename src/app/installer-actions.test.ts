@@ -397,6 +397,77 @@ test("update --json includes the first non-empty gatekeeper error line only", as
   }, `#!/bin/sh\necho >&2\necho '${message}' >&2\necho '    at file:///tmp/private/install.mjs' >&2\nexit 65\n`);
 });
 
+/** Installer diagnostics keep URLs intact and replace literal home, temp, and UNC paths. */
+test("installer diagnostics preserve URLs and sanitize literal paths including spaces and UNC roots", async () => {
+  await withGateServer(async (baseUrl, _requests, root) => {
+    const home = join(root, "Forge614 home", "Jorge Trejo");
+    const temp = join(root, "Forge614 temp", "Installer cache");
+    const unc = "\\\\server\\share\\Users\\Jorge Trejo";
+    const stderr = `No se pudo instalar Node.js desde https://nodejs.org; home=${home}; temp=${temp}; perfil=${unc}`;
+    let failure: unknown;
+    try {
+      await runInstallerGate("update", {
+      env: {
+        HOME: home,
+        USERPROFILE: unc,
+        FORGE614_HOME: join(home, ".forge614"),
+        TMPDIR: temp,
+        FORGE614_INSTALL_TEST_BASE_URL: baseUrl,
+      },
+      platform: "win32",
+      run: () => ({ exitCode: 1, stdout: "", stderr }),
+      });
+    } catch (error) {
+      failure = error;
+    }
+    const message = failure instanceof Error ? failure.message : String(failure);
+    expect(failure).toMatchObject({ exitCode: 1 });
+    expect(message).toContain("No se pudo instalar Node.js desde https://nodejs.org;");
+    expect(message).toContain("<home>");
+    expect(message).toContain("<tmp>");
+    expect(message).not.toContain(home);
+    expect(message).not.toContain(temp);
+    expect(message).not.toContain("Jorge Trejo");
+    expect(message).not.toContain("\\\\server\\share");
+  });
+});
+
+/** A missing targeted release includes its tag and HTTP status in the installer error. */
+test("a missing release download reports the requested tag and HTTP status", async () => {
+  await withGateServer(async (_baseUrl, _requests, home) => {
+    let executed = false;
+    await expect(runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614") },
+      platform: "darwin",
+      versionTag: "v9.9.9",
+      fetcher: Object.assign(async () => new Response("missing", { status: 404 }), { preconnect: () => {} }),
+      run: () => { executed = true; return { exitCode: 0, stdout: "", stderr: "" }; },
+    })).rejects.toMatchObject({ exitCode: 1, message: expect.stringContaining("release v9.9.9 not found (HTTP 404)") });
+    expect(executed).toBe(false);
+  });
+});
+
+/** A checksum-manifest download failure reports its HTTP status and never runs the gatekeeper. */
+test("a SHA256SUMS download failure includes its HTTP status and prevents execution", async () => {
+  await withGateServer(async (_baseUrl, _requests, home) => {
+    let requests = 0;
+    let executed = false;
+    const bytes = new TextEncoder().encode("#!/bin/sh\nexit 0\n");
+    await expect(runInstallerGate("update", {
+      env: { HOME: home, FORGE614_HOME: join(home, ".forge614") },
+      platform: "darwin",
+      versionTag: "v0.2.1",
+      fetcher: Object.assign(async () => {
+        requests += 1;
+        return requests === 1 ? new Response(bytes) : new Response("missing", { status: 503 });
+      }, { preconnect: () => {} }),
+      run: () => { executed = true; return { exitCode: 0, stdout: "", stderr: "" }; },
+    })).rejects.toMatchObject({ exitCode: 1, message: expect.stringContaining("SHA256SUMS for release v0.2.1 (HTTP 503)") });
+    expect(requests).toBe(2);
+    expect(executed).toBe(false);
+  });
+});
+
 test("uninstall --json reports removal after invoking the local published gate", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
     const stdout: string[] = [];

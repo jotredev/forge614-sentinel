@@ -96,14 +96,62 @@ function releaseAssetUrl(base: string | undefined, tag: string, name: string): s
     : `${base}/repos/${REPOSITORY}/${releasePath}`;
 }
 
+/** Replace literal path values without changing URL text. */
+function sanitizeInstallerDetail(detail: string, env: Record<string, string | undefined>, platform: string): string {
+  const insensitive = platform === "win32";
+  const paths = [
+    ...["FORGE614_HOME", "HOME", "USERPROFILE"].map((key) => ({ value: environmentValue(env, key), marker: "<home>" })),
+    ...["TMPDIR", "TEMP", "TMP"].map((key) => ({ value: environmentValue(env, key), marker: "<tmp>" })),
+  ].filter((entry): entry is { value: string; marker: string } => Boolean(entry.value))
+    .sort((left, right) => right.value.length - left.value.length);
+  const urls = new Map<string, string>();
+  let sanitized = detail.replace(/https?:\/\/[^\s]+/gi, (url) => {
+    const token = `__FORGE614_PRESERVED_URL_${randomUUID()}__`;
+    urls.set(token, url);
+    return token;
+  });
+  for (const { value, marker } of paths) sanitized = replaceLiteral(sanitized, value, marker, insensitive);
+  return sanitized.replace(/__FORGE614_PRESERVED_URL_[0-9a-f-]+__/g, (token) => urls.get(token) ?? token);
+}
+
+/** Replace every exact occurrence using the selected platform's path case rules. */
+function replaceLiteral(source: string, search: string, replacement: string, insensitive: boolean): string {
+  const haystack = insensitive ? source.toLocaleLowerCase("en-US") : source;
+  const needle = insensitive ? search.toLocaleLowerCase("en-US") : search;
+  let cursor = 0;
+  let result = "";
+  while (cursor < source.length) {
+    const index = haystack.indexOf(needle, cursor);
+    if (index < 0) return result + source.slice(cursor);
+    result += source.slice(cursor, index) + replacement;
+    cursor = index + search.length;
+  }
+  return result;
+}
+
+/** Raise an action error whose detail is safe to return to the CLI. */
+function actionFailure(detail: string, env: Record<string, string | undefined>, platform: string): InstallerActionError {
+  return new InstallerActionError(sanitizeInstallerDetail(detail, env, platform), 1);
+}
+
+/** Fetch an asset while converting network exceptions into a safe action error. */
+async function fetchReleaseResponse(fetcher: typeof fetch, url: string, env: Record<string, string | undefined>, platform: string): Promise<Response> {
+  try {
+    return await fetcher(url);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "network error";
+    throw actionFailure(detail, env, platform);
+  }
+}
+
 /** Resolve the selected release tag before downloading any of its assets. */
-async function selectedReleaseTag(base: string | undefined, versionTag: string | undefined, fetcher: typeof fetch): Promise<string> {
+async function selectedReleaseTag(base: string | undefined, versionTag: string | undefined, fetcher: typeof fetch, env: Record<string, string | undefined>, platform: string): Promise<string> {
   if (versionTag !== undefined) return versionTag;
-  const response = await fetcher(latestReleaseUrl(base));
-  if (!response.ok) throw new Error("Could not resolve the latest Forge614 Sentinel release.");
+  const response = await fetchReleaseResponse(fetcher, latestReleaseUrl(base), env, platform);
+  if (!response.ok) throw actionFailure(`Could not resolve the latest Forge614 Sentinel release (HTTP ${response.status}).`, env, platform);
   let tag: unknown;
   try { tag = (await response.json() as { tag_name?: unknown }).tag_name; } catch { tag = undefined; }
-  if (typeof tag !== "string" || !/^v?\d+\.\d+\.\d+$/.test(tag)) throw new Error("The latest Forge614 Sentinel release has an invalid tag.");
+  if (typeof tag !== "string" || !/^v?\d+\.\d+\.\d+$/.test(tag)) throw actionFailure("The latest Forge614 Sentinel release has an invalid tag.", env, platform);
   return tag.startsWith("v") ? tag : `v${tag}`;
 }
 
@@ -202,9 +250,9 @@ function spawnWindowsLauncherRemoval(
 }
 
 /** Keep the first useful gatekeeper message while replacing absolute paths with a marker. */
-function firstSafeInstallerErrorLine(stderr: string): string | undefined {
+function firstSafeInstallerErrorLine(stderr: string, env: Record<string, string | undefined>, platform: string): string | undefined {
   const line = stderr.split(/\r?\n/).map((entry) => entry.trim()).find((entry) => entry.length > 0);
-  return line?.replace(/(?:[A-Za-z]:\\|\/)(?:[^\\/\s]+[\\/])*[^\\/\s]*/g, "<path>");
+  return line === undefined ? undefined : sanitizeInstallerDetail(line, env, platform);
 }
 
 /** Read the version from the installed launcher, returning the supplied fallback when no launcher is available. */
@@ -222,13 +270,27 @@ export async function runInstallerGate(action: InstallerAction, options: Install
   const base = testBaseUrl(env);
   const file = platform === "win32" ? "install.ps1" : "install.sh";
   const fetcher = options.fetcher ?? fetch;
-  const tag = await selectedReleaseTag(base, action === "update" ? options.versionTag : undefined, fetcher);
-  const installerResponse = await fetcher(releaseAssetUrl(base, tag, file));
-  if (!installerResponse.ok) throw new Error("Could not download the Forge614 Sentinel installer.");
-  const installerBytes = new Uint8Array(await installerResponse.arrayBuffer());
-  const checksumResponse = await fetcher(releaseAssetUrl(base, tag, "SHA256SUMS"));
-  if (!checksumResponse.ok) throw new Error("Could not download the Forge614 Sentinel SHA256SUMS.");
-  verifyGatekeeperChecksum(file, installerBytes, await checksumResponse.text());
+  const tag = await selectedReleaseTag(base, action === "update" ? options.versionTag : undefined, fetcher, env, platform);
+  const installerResponse = await fetchReleaseResponse(fetcher, releaseAssetUrl(base, tag, file), env, platform);
+  if (!installerResponse.ok) {
+    const detail = installerResponse.status === 404
+      ? `release ${tag} not found (HTTP 404)`
+      : `Could not download the Forge614 Sentinel installer for release ${tag} (HTTP ${installerResponse.status}).`;
+    throw actionFailure(detail, env, platform);
+  }
+  let installerBytes: Uint8Array;
+  try {
+    installerBytes = new Uint8Array(await installerResponse.arrayBuffer());
+  } catch (error) {
+    throw actionFailure(error instanceof Error ? error.message : "installer download failed", env, platform);
+  }
+  const checksumResponse = await fetchReleaseResponse(fetcher, releaseAssetUrl(base, tag, "SHA256SUMS"), env, platform);
+  if (!checksumResponse.ok) throw actionFailure(`Could not download SHA256SUMS for release ${tag} (HTTP ${checksumResponse.status}).`, env, platform);
+  let sums: string;
+  try { sums = await checksumResponse.text(); } catch (error) {
+    throw actionFailure(error instanceof Error ? error.message : "SHA256SUMS download failed", env, platform);
+  }
+  verifyGatekeeperChecksum(file, installerBytes, sums);
   const directory = mkdtempSync(join(tmpdir(), "forge614-sentinel-installer-"));
   const installer = join(directory, file);
   try {
@@ -247,7 +309,7 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     try {
       const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
       if (result.exitCode !== 0) {
-        const detail = firstSafeInstallerErrorLine(result.stderr);
+        const detail = firstSafeInstallerErrorLine(result.stderr, env, platform);
         throw new InstallerActionError(detail || `The Forge614 Sentinel installer exited with code ${result.exitCode}.`, result.exitCode);
       }
     } catch (error) {
