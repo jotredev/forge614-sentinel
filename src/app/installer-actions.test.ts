@@ -93,7 +93,7 @@ test("Windows selects the PowerShell gatekeeper and forwards --latest", async ()
     });
     expect(requests).toEqual(["/repos/jotredev/forge614-sentinel/releases/latest/download/install.ps1"]);
     expect(call?.command).toBe("powershell.exe");
-    expect(call?.args).toEqual(["-NoProfile", "-File", expect.any(String), "--latest"]);
+    expect(call?.args).toEqual(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", expect.any(String), "--latest"]);
   });
 });
 
