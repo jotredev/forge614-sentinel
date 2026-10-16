@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { releasePublish } from "./release-publish";
@@ -14,6 +15,25 @@ function assetsDir(missing?: string): string {
 }
 
 const okExec: Exec = () => ({ exitCode: 0, stdout: "https://github.com/jotredev/forge614-sentinel/releases/tag/v0.1.0\n", stderr: "" });
+
+/** A missing release directory is reported as ten missing assets without invoking gh. */
+test("a missing assets directory reports every required asset without invoking gh", () => {
+  const dir = join(tmpdir(), `sentinel-assets-missing-${randomUUID()}`);
+  const calls: string[][] = [];
+  const result = releasePublish({
+    root: repoRoot,
+    tag: "v0.1.0",
+    version: "0.1.0",
+    assetsDir: dir,
+    exec: (command) => { calls.push(command); return okExec(command); },
+    dryRun: false,
+  });
+  const required = [...TARGETS.map(archiveName), "install.sh", "install.ps1", "install.mjs", "forge614.node.json", "SHA256SUMS"];
+  expect(result).toMatchObject({ ok: false, code: "RELEASE_ASSETS_MISSING" });
+  if (result.ok) return;
+  for (const name of required) expect(result.error).toContain(name);
+  expect(calls).toHaveLength(0);
+});
 
 test("dry run: publishes all prepared release files without rewriting SHA256SUMS", () => {
   const dir = assetsDir();

@@ -6,8 +6,9 @@ export type ReleasePublishResult =
   | { ok: true; tag: string; version: string; assets: string[]; command: string[]; published: boolean }
   | { ok: false; code: "RELEASE_TAG_MISMATCH" | "RELEASE_ASSETS_MISSING" | "RELEASE_PUBLISH_FAILED"; error: string };
 
-// Publishes the prepared dist/release file set. The standard template creates
-// SHA256SUMS after staging all installer files and program archives.
+// Publishes prepared release assets; a missing assets directory is reported as
+// the complete missing-asset list, while other directory-read errors propagate.
+// The standard template creates SHA256SUMS after staging installers and archives.
 export function releasePublish(options: { root: string; tag: string; version: string; assetsDir: string; exec: Exec; dryRun: boolean }): ReleasePublishResult {
   if (options.tag !== `v${options.version}`) {
     return { ok: false, code: "RELEASE_TAG_MISMATCH", error: `tag '${options.tag}' does not name package.json version '${options.version}' (expected 'v${options.version}')` };
@@ -16,7 +17,14 @@ export function releasePublish(options: { root: string; tag: string; version: st
     ...TARGETS.map(archiveName),
     "install.sh", "install.ps1", "install.mjs", "forge614.node.json", "SHA256SUMS",
   ];
-  const entries = readdirSync(options.assetsDir, { withFileTypes: true });
+  const entries = (() => {
+    try {
+      return readdirSync(options.assetsDir, { withFileTypes: true });
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") return [];
+      throw error;
+    }
+  })();
   const names = entries.filter((entry) => entry.isFile()).map((entry) => entry.name).sort();
   const missing = required.filter((name) => !names.includes(name));
   if (missing.length > 0) return { ok: false, code: "RELEASE_ASSETS_MISSING", error: `missing release assets: ${missing.join(", ")}` };
