@@ -248,21 +248,27 @@ test("Windows update restores the launcher after a successful gate that writes n
 
 /** A Windows update signal restores the launcher while the gatekeeper is still running. */
 test("Windows update restores its launcher when interrupted while the gate runs", async () => {
-  await withGateServer(async (baseUrl, _requests, home) => {
-    const launcher = join(home, ".forge614", "sentinel", "bin", "forge614-sentinel.exe");
-    mkdirSync(dirname(launcher), { recursive: true });
-    writeFileSync(launcher, "running launcher");
-    await runInstallerGate("update", {
-      env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
-      platform: "win32",
-      processExecPath: launcher,
-      run: () => {
-        process.emit("SIGTERM");
-        expect(readFileSync(launcher, "utf8")).toBe("running launcher");
-        return { exitCode: 0, stdout: "interrupted", stderr: "" };
-      },
-    } as Parameters<typeof runInstallerGate>[1]);
-  });
+  for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK"] as const) {
+    await withGateServer(async (baseUrl, _requests, home) => {
+      const launcher = join(home, ".forge614", "sentinel", "bin", "forge614-sentinel.exe");
+      mkdirSync(dirname(launcher), { recursive: true });
+      writeFileSync(launcher, "running launcher");
+      await runInstallerGate("update", {
+        env: { HOME: home, FORGE614_HOME: join(home, ".forge614"), FORGE614_INSTALL_TEST_BASE_URL: baseUrl },
+        platform: "win32",
+        processExecPath: launcher,
+        run: async (_command, _args, options) => {
+          let stopped = false;
+          (options as { onStarted?: (stop: () => void) => void }).onStarted?.(() => { stopped = true; });
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          process.emit(signal);
+          expect(stopped, signal).toBe(true);
+          expect(readFileSync(launcher, "utf8"), signal).toBe("running launcher");
+          return { exitCode: 0, stdout: "interrupted", stderr: "" };
+        },
+      } as Parameters<typeof runInstallerGate>[1]);
+    });
+  }
 });
 
 /** Windows uninstall must move the running executable outside the node folder before removal. */
