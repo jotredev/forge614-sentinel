@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { run } from "../../src/infrastructure/process";
 import { SENTINEL_VERSION } from "../../src/interfaces/cli/version";
 import { builtBinary } from "./binary";
 
@@ -52,7 +51,16 @@ test.skipIf(process.platform === "win32")("real install.sh + install.mjs install
     if (archive !== hostArchive) writeFileSync(join(releaseDir, archive), "unused platform asset");
   }
 
-  const prepared = run(["bun", "run", join(REPO_ROOT, "scripts/prepare-release-assets.mjs")], { cwd: stageRoot });
+  const prepareEnv = Object.fromEntries(
+    Object.entries(process.env).filter((entry): entry is [string, string] => entry[1] !== undefined && entry[0] !== "GITHUB_REF_NAME"),
+  );
+  const prepareProcess = Bun.spawnSync(["bun", "run", join(REPO_ROOT, "scripts/prepare-release-assets.mjs")], {
+    cwd: stageRoot,
+    env: prepareEnv,
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const prepared = { exitCode: prepareProcess.exitCode, stderr: new TextDecoder().decode(prepareProcess.stderr) };
   expect(prepared.exitCode, prepared.stderr).toBe(0);
   expect(readdirSync(releaseDir).sort()).toEqual([
     "SHA256SUMS",
