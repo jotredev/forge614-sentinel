@@ -22,6 +22,8 @@ Windows (PowerShell):
 irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex
 ```
 
+Node.js 22.19.0 or later is required to install Sentinel.
+
 ## Documentation
 | # | Español | English |
 | --- | --- | --- |
@@ -33,4 +35,4 @@ irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/insta
 | — | [Contrato](CONTRACT.md) | [Contract](CONTRACT.en.md) |
 
 ## Contract
-See [`CONTRACT.md`](CONTRACT.md) (standard 1.0.2).
+See [`CONTRACT.en.md`](CONTRACT.en.md) (standard 1.2.1).

@@ -10,7 +10,7 @@ It decides what to do only from identity files (decision 0023): with a valid `fo
 
 ## Install and run in one minute
 
-macOS / Linux: `curl -fsSL https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.sh | bash`. Windows: `irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex`. The installer places the binary in `~/.forge614/sentinel/<version>/` and the launcher in `~/.forge614/sentinel/bin/forge614-sentinel`; it verifies the fingerprint published in `SHA256SUMS` before installing.
+macOS / Linux: `curl -fsSL https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.sh | bash`. Windows (PowerShell): `irm https://github.com/jotredev/forge614-sentinel/releases/latest/download/install.ps1 | iex`. Node.js 22.19.0 or later is required to install. The installer places the binary in `~/.forge614/sentinel/<version>/` and the launcher in `~/.forge614/sentinel/bin/forge614-sentinel`; it verifies the fingerprint published in `SHA256SUMS` before installing.
 
 At the root of a node: `forge614-sentinel check --json`. The first time it downloads the declared standard (document 02); later runs use no network. Exit code `0` with `pass` or `caution`, `1` with `fail`, `2` with invalid arguments.
 

@@ -33,6 +33,10 @@ Check any repository of the ecosystem against the Node Standard it declares and 
 | --- | --- | --- | --- | --- |
 | `forge614-sentinel check` | `[--repo <path>] [--standard <X.Y.Z>] [--only <id,id>] [--strict] [--json]` | `CheckReport` or `{ applicable: false, reason }` | `1` | `0` pass, caution, not applicable; `1` fail, caution with `--strict`, `NODE_POINTER_MISSING`, `STANDARD_UNAVAILABLE`, `STANDARD_CORRUPT`, `STANDARD_FETCH_FAILED`, `CHECK_FAILED`, `SENTINEL_FAILED`; `2` `INVALID_ARGUMENTS`, `NODE_POINTER_INVALID` |
 | `forge614-sentinel standard fetch` | `[<X.Y.Z>] [--json]` (without a version it uses `./forge614.node.json`) | `{ version, sha256, alreadyCached, location }` | `1` | `0`; `1` `STANDARD_FETCH_FAILED`, `STANDARD_CORRUPT`, `SENTINEL_FAILED`; `2` `INVALID_ARGUMENTS` |
+| `forge614-sentinel --version` | `[--json]` | text `forge614-sentinel X.Y.Z` or `{ name, version }` | `1` | `0` |
+| `forge614-sentinel update` | `[--json]` | human-readable sentence or `{ updated, previousVersion, installedVersion }` | `1` | `0`; `1` `UPDATE_FAILED`; `2` `INVALID_ARGUMENTS` |
+| `forge614-sentinel uninstall` | `[--json]` | human-readable sentence or `{ result: { removed: true } }` | `1` | `0`; `1` `UNINSTALL_FAILED`; `2` `INVALID_ARGUMENTS`; `130` cancelled |
+| `forge614-sentinel uninstall --self` | `[--json]` | human-readable sentence or `{ result: { integrationsRemoved: true } }` | `1` | `0`; `2` `INVALID_ARGUMENTS` |
 | `bun run verify` | `[--skip-tests]` | `{ ok: true, steps, sentinel: { verdict, durationMs } }` | `1` | `0`; `1` `VERIFY_STEP_FAILED`, `VERIFY_FAILED`; `2` `INVALID_ARGUMENTS` |
 | `bun run sentinel:check` | none (alias of `check --repo . --json`) | `CheckReport` | `1` | those of `check` |
 | `bun run sentinel:parity` | `[--update]` | `{ ok: true, compared }` | `1` | `0`; `1` `PARITY_MISMATCH`, `PARITY_FAILED`; `2` `INVALID_ARGUMENTS` |
@@ -43,7 +47,7 @@ Check any repository of the ecosystem against the Node Standard it declares and 
 | `bun run smoke:target` | `[--target <t>]` or `FORGE614_TARGET` | `{ target, version, steps }` | `1` | `0`; `1` `SMOKE_FAILED`; `2` `INVALID_ARGUMENTS` |
 | `bun run release:publish` | `[--tag vX.Y.Z] [--dry-run]` (without `--tag` it uses `GITHUB_REF_NAME`) | `{ tag, version, assets, command, published }` | `1` | `0`; `1` `RELEASE_TAG_MISMATCH`, `RELEASE_ASSETS_MISSING`, `RELEASE_PUBLISH_FAILED`; `2` `INVALID_ARGUMENTS` |
 
-Every data output is a single JSON object on stdout with `schemaVersion: 1`; every error is `{ schemaVersion: 1, code, error }` on stderr without absolute paths; no command prints a stack trace. All of them accept `--help` (prints `{ usage }`) and `--version` (`{ name: "forge614-sentinel", version }`) before parsing any other argument. Environment variables: `FORGE614_HOME` (cache root), and only for tests and CI without network, `FORGE614_SENTINEL_RELEASE_BASE`, `FORGE614_SENTINEL_OFFLINE`, `FORGE614_SENTINEL_CRASH_CHECK`.
+JSON outputs are a single object with `schemaVersion: 1`; `--version` prints text by default and JSON with `--json`. Every error is `{ schemaVersion: 1, code, error }` on stderr without absolute paths; no command prints a stack trace. The CLI accepts `--help` and `--version` before parsing remaining arguments. Environment variables: `FORGE614_HOME` (cache and install root), `FORGE614_INSTALL_TEST_BASE_URL` (tests with a loopback server only), and only for tests and CI without network, `FORGE614_SENTINEL_RELEASE_BASE`, `FORGE614_SENTINEL_OFFLINE`, `FORGE614_SENTINEL_CRASH_CHECK`.
 
 ## Error codes
 | Code | Meaning |
@@ -68,8 +72,10 @@ Every data output is a single JSON object on stdout with `schemaVersion: 1`; eve
 | `BUILD_FAILED` | `build:target`: `bun build --compile` failed |
 | `SMOKE_FAILED` | `smoke:target`: the binary does not answer `--version`/`--help` or `check` on the fixture does not give `pass` |
 | `RELEASE_TAG_MISMATCH` | `release:publish`: the tag is not `v<package.json.version>` |
-| `RELEASE_ASSETS_MISSING` | `release:publish`: one of the five artifacts is missing |
+| `RELEASE_ASSETS_MISSING` | `release:publish`: one of the ten required files is missing |
 | `RELEASE_PUBLISH_FAILED` | `release:publish`: `gh` could not run or the release was not created |
+| `UPDATE_FAILED` | `update`: the published installer could not run; exit `1` |
+| `UNINSTALL_FAILED` | `uninstall`: the published installer could not run; exit `1` |
 
 ## Mandatory requirements for supported AI assistants
 `sentinel` section of `standard/procedures/new-agent-checklist.md` (standard 1.0.2): it does not exist because Sentinel does not integrate AI assistants; assistants consume its JSON report like any other tool.
