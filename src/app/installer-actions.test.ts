@@ -49,7 +49,7 @@ function taggedGateRequests(tag: string, file: string): string[] {
   ];
 }
 
-test("update downloads the loopback gate and runs it with --latest in a temporary environment", async () => {
+test("latest update pins the resolved release tag when invoking the loopback gate", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
     const calls: { command: string; args: string[]; options?: { env?: Record<string, string> } }[] = [];
     await runInstallerGate("update", {
@@ -64,7 +64,7 @@ test("update downloads the loopback gate and runs it with --latest in a temporar
     expect(requests).toEqual(latestGateRequests("install.sh"));
     expect(calls).toHaveLength(1);
     expect(calls[0]?.command).toBe("sh");
-    expect(calls[0]?.args[1]).toBe("--latest");
+    expect(calls[0]?.args).toEqual([expect.any(String), "--version", "v0.2.1"]);
     expect(calls[0]?.options?.env).toMatchObject({ FORGE614_INSTALL_TEST_BASE_URL: baseUrl, FORGE614_HOME: join(home, ".forge614") });
   });
 });
@@ -145,7 +145,7 @@ test("uninstall downloads the loopback gate and runs it with --uninstall", async
   });
 });
 
-test("Windows selects the PowerShell gatekeeper and forwards --latest", async () => {
+test("Windows latest update forwards the resolved release tag to PowerShell", async () => {
   await withGateServer(async (baseUrl, requests, home) => {
     let call: { command: string; args: string[] } | undefined;
     await runInstallerGate("update", {
@@ -158,7 +158,7 @@ test("Windows selects the PowerShell gatekeeper and forwards --latest", async ()
     });
     expect(requests).toEqual(latestGateRequests("install.ps1"));
     expect(call?.command).toBe("powershell.exe");
-    expect(call?.args).toEqual(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", expect.any(String), "--latest"]);
+    expect(call?.args).toEqual(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", expect.any(String), "--version", "v0.2.1"]);
   });
 });
 
