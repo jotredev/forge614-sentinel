@@ -7,6 +7,11 @@ import { printVersionIfRequested } from "./version";
 const USAGE = "uninstall [--json] [--self]";
 const Args = z.object({ help: z.literal(true).optional(), json: z.literal(true).optional(), self: z.literal(true).optional() }).strict();
 
+/** Identify readline cancellation and end-of-input errors as a user's negative answer. */
+function isConfirmationCancellation(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || (error as NodeJS.ErrnoException).code === "ERR_USE_AFTER_CLOSE");
+}
+
 /** Output callbacks used by the uninstall command and its tests. */
 export interface UninstallCommandIO {
   /** Write one successful output line. */
@@ -48,7 +53,14 @@ export async function uninstallMain(
       const terminal = createInterface({ input: process.stdin, output: process.stdout });
       try { return await terminal.question(message); } finally { terminal.close(); }
     });
-    const answer = (await confirm(prompt)).trim().toLocaleLowerCase("en-US");
+    let response: string;
+    try {
+      response = await confirm(prompt);
+    } catch (error) {
+      if (isConfirmationCancellation(error)) return 130;
+      throw error;
+    }
+    const answer = response.trim().toLocaleLowerCase("en-US");
     if (answer !== "s" && answer !== "y") return 130;
   }
   try {
