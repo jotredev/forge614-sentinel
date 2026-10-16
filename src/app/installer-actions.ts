@@ -10,12 +10,18 @@ const REPOSITORY = "jotredev/forge614-sentinel";
 /** Supported actions delegated to the published installer gatekeeper. */
 export type InstallerAction = "update" | "uninstall";
 
-/** Process runner used to execute a downloaded gatekeeper; replaceable in tests. */
-export type InstallerProcess = (command: string, args: string[], options: { env: Record<string, string> }) => {
+/** Result returned after a downloaded gatekeeper exits. */
+export interface InstallerProcessResult {
+  /** Exit status returned by the gatekeeper process. */
   exitCode: number;
+  /** Captured standard output. */
   stdout: string;
+  /** Captured standard error. */
   stderr: string;
-};
+}
+
+/** Process runner used to execute a downloaded gatekeeper; replaceable in tests. */
+export type InstallerProcess = (command: string, args: string[], options: { env: Record<string, string>; onStarted?: (stop: () => void) => void }) => InstallerProcessResult | Promise<InstallerProcessResult>;
 
 /** Inputs shared by update and uninstall installer actions. */
 export interface InstallerActionOptions {
@@ -263,6 +269,29 @@ function spawnWindowsLauncherRemoval(
   child.unref();
 }
 
+/** Run the gatekeeper asynchronously so process signals can restore the parked launcher. */
+function runGatekeeperProcess(
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+  onStarted?: (stop: () => void) => void,
+): Promise<InstallerProcessResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    let stdout = "";
+    let stderr = "";
+    child.stdout?.setEncoding("utf8");
+    child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => { stdout += chunk; });
+    child.stderr?.on("data", (chunk: string) => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", (exitCode, signal) => {
+      resolve({ exitCode: exitCode ?? (signal === "SIGINT" ? 130 : 1), stdout, stderr });
+    });
+    onStarted?.(() => { if (!child.killed) child.kill(); });
+  });
+}
+
 /** Keep the first useful gatekeeper message while replacing absolute paths with a marker. */
 function firstSafeInstallerErrorLine(stderr: string, env: Record<string, string | undefined>, platform: string): string | undefined {
   const line = stderr.split(/\r?\n/).map((entry) => entry.trim()).find((entry) => entry.length > 0);
@@ -316,11 +345,16 @@ export async function runInstallerGate(action: InstallerAction, options: Install
     const args = platform === "win32" ? ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", installer, ...actionArgs] : [installer, ...actionArgs];
     const parked = platform === "win32" ? parkRunningWindowsLauncher(action, env, options.processExecPath ?? process.execPath) : undefined;
     const updateParked = action === "update" ? parked : undefined;
+    let stopGatekeeper: (() => void) | undefined;
     const signals: NodeJS.Signals[] = ["SIGINT", "SIGTERM", ...(platform === "win32" ? ["SIGBREAK" as const] : [])];
-    const restoreOnSignal = () => restoreParkedWindowsLauncher(updateParked);
+    const restoreOnSignal = () => {
+      restoreParkedWindowsLauncher(updateParked);
+      try { stopGatekeeper?.(); } catch { /* a child that already exited needs no interruption */ }
+    };
     if (updateParked) for (const signal of signals) process.on(signal, restoreOnSignal);
     try {
-      const result = await (options.run ?? ((cmd, argv, runOptions) => runCommand([cmd, ...argv], { env: runOptions.env })))(command, args, { env: processEnv });
+      const runOptions = { env: processEnv, onStarted: (stop: () => void) => { stopGatekeeper = stop; } };
+      const result = await (options.run ?? ((cmd, argv, runOptions) => runGatekeeperProcess(cmd, argv, runOptions.env, runOptions.onStarted)))(command, args, runOptions);
       if (result.exitCode !== 0) {
         const detail = firstSafeInstallerErrorLine(result.stderr, env, platform);
         throw new InstallerActionError(detail || `The Forge614 Sentinel installer exited with code ${result.exitCode}.`, result.exitCode);
