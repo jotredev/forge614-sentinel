@@ -12,6 +12,8 @@ export interface RepoFacts {
 
 export interface RepoSnapshot {
   readonly files: ReadonlyMap<string, string>;
+  /** Original file bytes, retained for checks where line-ending normalization is unsafe. */
+  readonly rawFiles?: ReadonlyMap<string, Uint8Array>;
   readonly facts: RepoFacts;
 }
 
@@ -28,11 +30,19 @@ export const EMPTY_FACTS: RepoFacts = {
 export const MAX_TEXT_BYTES = 2 * 1024 * 1024;
 
 export function snapshotFrom(entries: Record<string, string>, facts: Partial<RepoFacts> = {}): RepoSnapshot {
-  return { files: new Map(Object.entries(entries)), facts: { ...EMPTY_FACTS, ...facts } };
+  return { files: new Map(Object.entries(entries)), rawFiles: new Map(Object.entries(entries).map(([path, text]) => [path, new TextEncoder().encode(text)])), facts: { ...EMPTY_FACTS, ...facts } };
 }
 
 export function read(snapshot: RepoSnapshot, path: string): string | undefined {
   return snapshot.files.get(path);
+}
+
+/** Returns raw bytes when available, or UTF-8 bytes for synthetic snapshots. */
+export function readRaw(snapshot: RepoSnapshot, path: string): Uint8Array | undefined {
+  const raw = snapshot.rawFiles?.get(path);
+  if (raw !== undefined) return raw;
+  const text = snapshot.files.get(path);
+  return text === undefined ? undefined : new TextEncoder().encode(text);
 }
 
 export function has(snapshot: RepoSnapshot, path: string): boolean {

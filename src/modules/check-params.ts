@@ -31,6 +31,7 @@ export interface SecretPattern {
 export interface SecretsSpec {
   patterns: readonly SecretPattern[];
   excludePaths: readonly string[];
+  allowedMarkers: readonly string[];
   source: "builtin" | "standard/secret-patterns.json";
 }
 
@@ -47,6 +48,8 @@ export interface CheckParams {
   manifests: ReadonlyMap<string, RuleManifest>;
   forbiddenMentions: { terms: readonly string[]; excludePaths: readonly string[] };
   templates: ReadonlyMap<string, string>;
+  /** Original template bytes, before text decoding or line-ending normalization. */
+  rawTemplates: ReadonlyMap<string, Uint8Array>;
   ecosystemContract: string;
   layout: LayoutSpec;
   stack: StackSpec;

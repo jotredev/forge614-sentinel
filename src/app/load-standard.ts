@@ -1,10 +1,12 @@
-import { cachedVersions, readCacheManifest, readCachedFiles } from "../infrastructure/cache";
+import { cachedVersions, readCacheManifest, readCachedFiles, readCachedRawFiles } from "../infrastructure/cache";
 import { highestSemver } from "../modules/semver";
 
 export interface LoadedStandard {
   version: string;
   sha256: string;
   files: ReadonlyMap<string, string>;
+  /** Cached source bytes used by checks that require exact template equality. */
+  rawFiles: ReadonlyMap<string, Uint8Array>;
   latestKnown: string;
 }
 
@@ -36,5 +38,6 @@ export function loadStandard(options: { version: string; expectedSha256?: string
   }
   const files = readCachedFiles(options.cacheRoot, options.version);
   const latestKnown = highestSemver([...cachedVersions(options.cacheRoot), options.version]) ?? options.version;
-  return { ok: true, standard: { version: options.version, sha256: read.manifest.sha256, files, latestKnown } };
+  const rawFiles = readCachedRawFiles(options.cacheRoot, options.version);
+  return { ok: true, standard: { version: options.version, sha256: read.manifest.sha256, files, rawFiles, latestKnown } };
 }

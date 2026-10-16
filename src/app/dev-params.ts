@@ -16,6 +16,7 @@ export function devCheckParams(sentinelVersion: string, today: string): CheckPar
     manifests: new Map(),
     forbiddenMentions: { terms: [], excludePaths: [] },
     templates: new Map(),
+    rawTemplates: new Map(),
     ecosystemContract: "",
     layout: BUILTIN_LAYOUT,
     stack: BUILTIN_STACK,

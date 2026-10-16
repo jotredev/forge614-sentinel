@@ -71,3 +71,45 @@ test("a CRLF checkout of install.sh passes", async () => {
   expect(readFileSync(join(root, "install.sh"), "utf8")).toContain("\r\n");
   expect(installerCheck.run(takeSnapshot(root), params).verdict).toBe("pass");
 });
+
+test("new-template mode compares install.mjs and both porters as raw bytes", () => {
+  const templates = new Map([
+    ["install.mjs", "export const installer = true;\n"],
+    ["install.sh", 'NODE_NAME="{{NODE_NAME}}"\nREPO="{{REPO}}"\n'],
+    ["install.ps1", '\uFEFF$NodeName = "{{NODE_NAME}}"; $Repo = "{{REPO}}"\n'],
+  ]);
+  const pointer = {
+    ...DEMO_POINTER,
+    install: {
+      repository: "jotredev/forge614-demo",
+      minimumNodeVersion: "22.19.0",
+      systems: [
+        { os: "darwin" as const, architectures: ["arm64" as const, "x64" as const] },
+        { os: "linux" as const, architectures: ["arm64" as const, "x64" as const] },
+        { os: "windows" as const, architectures: ["x64" as const] },
+      ],
+      tagFormat: "vX.Y.Z" as const,
+      asset: { type: "binary-tar-gzip-or-zip" as const, pattern: "forge614-demo-<plat>-<arch>.tar.gz|.zip", checksumFile: "SHA256SUMS" as const },
+      dependencies: [],
+      path: { modify: false, retireWhen: null },
+      smokeTest: ["--version"],
+    },
+  };
+  const params = testParams({ pointer, templates });
+  const good = snapshotFromDir("installer-new/pass");
+  expect(installerCheck.run(good, params).verdict).toBe("pass");
+  expect(installerCheck.run(snapshotFromDir("installer-new/fail-mjs"), params).verdict).toBe("fail");
+  expect(installerCheck.run(snapshotFromDir("installer-new/fail-no-bom"), params).verdict).toBe("fail");
+  const crlf = snapshotFrom(Object.fromEntries([...good.files].map(([path, text]) => [path, path === "install.sh" ? text.replace(/\n/g, "\r\n") : text])));
+  expect(installerCheck.run(crlf, params).verdict).toBe("fail");
+  expect(installerCheck.run(good, testParams({ templates, pointer: DEMO_POINTER })).evidence).toContain("install block missing for new installer template");
+  const install = pointer.install;
+  const missingPlatform = { ...install, systems: install.systems.filter((system) => system.os !== "windows") };
+  const missingPlatformResult = installerCheck.run(good, testParams({ templates, pointer: { ...pointer, install: missingPlatform } }));
+  expect(missingPlatformResult.verdict).toBe("fail");
+  expect(missingPlatformResult.evidence).toContain("install block is missing required system windows-x64");
+  const unresolvedPattern = { ...install, asset: { ...install.asset, pattern: "forge614-demo-<unknown>.tar.gz" } };
+  const unresolvedResult = installerCheck.run(good, testParams({ templates, pointer: { ...pointer, install: unresolvedPattern } }));
+  expect(unresolvedResult.verdict).toBe("fail");
+  expect(unresolvedResult.evidence).toContain("install.asset.pattern cannot resolve darwin-arm64");
+});

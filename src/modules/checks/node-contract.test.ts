@@ -28,7 +28,7 @@ test("reports missing script, unlisted public script, ghost code, unlisted cli c
   expect(r.evidence).toEqual([
     "CONTRACT.md: command 'bun run nope' has no package.json script 'nope'",
     "package.json: script 'release:publish' is run by the standard's workflow templates but CONTRACT.md does not list 'bun run release:publish'",
-    "CONTRACT.md: code GHOST_CODE not found in src/interfaces/cli",
+    "CONTRACT.md: code GHOST_CODE not found in src/**/*.ts",
     "src/interfaces/cli/main.ts:1: code UNLISTED_CODE not in CONTRACT.md",
     "CONTRACT.md: 2 command rows vs CONTRACT.en.md: 1",
     "CONTRACT.md: 2 error code rows vs CONTRACT.en.md: 1",
@@ -38,4 +38,16 @@ test("reports missing script, unlisted public script, ghost code, unlisted cli c
 test("a missing twin or a missing package.json is evidence", () => {
   const r = nodeContractCheck.run(snapshotFrom({ "CONTRACT.md": "# c\n## Comandos públicos\n| Comando | x |\n| --- | --- |\n| `bun run a` | y |\n" }), params);
   expect(r.evidence).toEqual(expect.arrayContaining(["CONTRACT.en.md missing", "package.json missing"]));
+});
+
+test("finds emitted codes in any source file and skips reserved contract rows", () => {
+  const contract = "## Códigos de error\n| Código | Significado |\n| --- | --- |\n| `LIVE_CODE` | Error real |\n| `RESERVED_CODE` | Reservado para el estándar |\n";
+  const s = snapshotFrom({
+    "CONTRACT.md": contract,
+    "CONTRACT.en.md": contract.replace("Códigos de error", "Error codes"),
+    "package.json": "{}",
+    "src/app/real.ts": 'export const code = "LIVE_CODE";',
+  });
+  const r = nodeContractCheck.run(s, params);
+  expect(r.verdict).toBe("pass");
 });

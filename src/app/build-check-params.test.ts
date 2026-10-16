@@ -51,13 +51,15 @@ test("standard/layout.json, stack.json and secret-patterns.json override the bui
   const files = new Map(base.files);
   files.set("layout.json", JSON.stringify({ schemaVersion: 1, directories: ["src"], files: ["README.md"] }));
   files.set("stack.json", JSON.stringify({ schemaVersion: 1, tsconfigFlags: ["strict"], minimumBun: "1.4.2" }));
-  files.set("secret-patterns.json", JSON.stringify({ schemaVersion: 1, patterns: [{ id: "x", pattern: "XSECRET[0-9]+" }], excludePaths: ["fixtures/"] }));
+  files.set("secret-patterns.json", JSON.stringify({ schemaVersion: 1, patterns: [{ id: "x", pattern: "XSECRET[0-9]+" }], excludePaths: ["fixtures/"], allowedMarkers: ["fake-marker"] }));
   const r = buildCheckParams({ ...common, standard: { ...base, files } });
   expect(r.ok).toBe(true);
   if (!r.ok) return;
   expect(r.params.layout).toEqual({ directories: ["src"], files: ["README.md"], source: "standard/layout.json" });
   expect(r.params.stack).toEqual({ tsconfigFlags: ["strict"], minimumBun: "1.4.2", source: "standard/stack.json" });
   expect(r.params.secrets.patterns).toEqual([{ id: "x", pattern: "XSECRET[0-9]+" }]);
+  expect(r.params.secrets.allowedMarkers).toContain("fake-marker");
+  expect(r.params.secrets.allowedMarkers).toContain("EXAMPLE");
 });
 
 test("a standard whose pack.json or a manifest is invalid is STANDARD_CORRUPT (its sha256 passed, so the release itself is broken)", async () => {

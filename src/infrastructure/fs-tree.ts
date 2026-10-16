@@ -19,6 +19,8 @@ export interface TreeOptions {
 
 export interface TreeRead {
   files: Map<string, string>;
+  /** Original bytes alongside normalized text for byte-sensitive checks. */
+  rawFiles: Map<string, Uint8Array>;
   skippedLargeFiles: string[];
 }
 
@@ -50,12 +52,14 @@ function readOne(root: string, rel: string, out: TreeRead): void {
     out.skippedLargeFiles.push(rel);
     return;
   }
-  out.files.set(rel, normalizeText(readFileSync(full, "utf8")));
+  const bytes = readFileSync(full);
+  out.rawFiles.set(rel, bytes);
+  out.files.set(rel, normalizeText(bytes.toString("utf8")));
 }
 
 export function walkTree(root: string, options: TreeOptions = {}): TreeRead {
   const ignore = new Set([...DEFAULT_IGNORE, ...(options.ignore ?? [])]);
-  const out: TreeRead = { files: new Map(), skippedLargeFiles: [] };
+  const out: TreeRead = { files: new Map(), rawFiles: new Map(), skippedLargeFiles: [] };
   const walk = (dir: string): void => {
     for (const name of readdirSync(dir).sort()) {
       if (ignore.has(name)) continue;
@@ -72,7 +76,7 @@ export function walkTree(root: string, options: TreeOptions = {}): TreeRead {
 }
 
 export function readListedFiles(root: string, paths: readonly string[]): TreeRead {
-  const out: TreeRead = { files: new Map(), skippedLargeFiles: [] };
+  const out: TreeRead = { files: new Map(), rawFiles: new Map(), skippedLargeFiles: [] };
   for (const rel of [...paths].sort()) {
     const name = rel.split("/").at(-1) ?? rel;
     if (isTextFile(name)) readOne(root, rel, out);

@@ -34,6 +34,12 @@ export function readCachedFiles(root: string, version: string): ReadonlyMap<stri
   return walkTree(join(root, version, "content")).files;
 }
 
+/** Reads original cached file bytes for exact template comparisons. */
+export function readCachedRawFiles(root: string, version: string): ReadonlyMap<string, Uint8Array> {
+  const files = readCachedFiles(root, version);
+  return new Map([...files.keys()].map((path) => [path, readFileSync(join(root, version, "content", path))]));
+}
+
 export function cachedVersions(root: string): string[] {
   if (!existsSync(root)) return [];
   return readdirSync(root)

@@ -10,6 +10,7 @@ export function takeSnapshot(root: string): RepoSnapshot {
   const tree = git.listing === undefined ? walkTree(root) : readListedFiles(root, git.listing);
   return {
     files: tree.files,
+    rawFiles: tree.rawFiles,
     facts: {
       gitAvailable: git.available,
       gitTags: git.tags,

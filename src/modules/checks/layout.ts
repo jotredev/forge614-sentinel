@@ -28,7 +28,10 @@ export const layoutCheck: CheckDefinition = {
       }
     }
     // STANDARD §2: scripts/ holds only what the standard does not provide.
-    const templateNames = new Set([...params.templates.keys()].map(basename));
+    const templateNames = new Set([...params.templates.keys()].map(basename).filter((name) => {
+      if (params.pointer.node === "ai" && (name === "install.mjs" || name === "prepare-release-assets.mjs")) return false;
+      return !(params.templates.has("install.mjs") && name === "prepare-release-assets.mjs");
+    }));
     for (const path of listUnder(snapshot, "scripts/")) {
       const name = basename(path);
       if (templateNames.has(name)) {

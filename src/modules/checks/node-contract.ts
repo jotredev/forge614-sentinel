@@ -25,14 +25,14 @@ function publicScripts(templates: ReadonlyMap<string, string>): Set<string> {
 }
 
 function codesOf(rows: string[][]): string[] {
-  return rows.map((r) => CODE_CELL.exec(r[0] ?? "")?.[1]).filter((c): c is string => c !== undefined && ERROR_CODE_PATTERN.test(c));
+  return rows.filter((r) => !/^(?:reservado|reserved)\b/i.test((r[1] ?? "").trim())).map((r) => CODE_CELL.exec(r[0] ?? "")?.[1]).filter((c): c is string => c !== undefined && ERROR_CODE_PATTERN.test(c));
 }
 
 // The contract is a promise about package.json and the CLI; this check
 // keeps the three in step, in both directions: every command row names a
 // real script and every public script has a row; every listed code is a
 // literal in the CLI and every CLI code is listed. Binary commands
-// (`forge614-<node> …`) are not executed in 0.1: machine-contracts (0.2)
+// (`forge614-<node> …`) are not executed in 0.2: machine-contracts (0.3)
 // does that.
 export const nodeContractCheck: CheckDefinition = {
   id: "node-contract",
@@ -74,9 +74,10 @@ export const nodeContractCheck: CheckDefinition = {
       }
 
       const listed = new Set(codesOf(tableRowsAfter(es, HEADINGS.es.codes)));
-      const cliFiles = listUnder(snapshot, "src/interfaces/cli/").filter((p) => p.endsWith(".ts") && !p.endsWith(".test.ts"));
-      const cliText = cliFiles.map((p) => read(snapshot, p) ?? "").join("\n");
-      for (const code of listed) if (!cliText.includes(`"${code}"`)) evidence.push(`CONTRACT.md: code ${code} not found in src/interfaces/cli`);
+      const sourceFiles = listUnder(snapshot, "src/").filter((p) => p.endsWith(".ts") && !p.endsWith(".test.ts"));
+      const sourceText = sourceFiles.map((p) => read(snapshot, p) ?? "").join("\n");
+      for (const code of listed) if (!sourceText.includes(`"${code}"`)) evidence.push(`CONTRACT.md: code ${code} not found in src/**/*.ts`);
+      const cliFiles = sourceFiles.filter((p) => p.startsWith("src/interfaces/cli/"));
       const reported = new Set<string>();
       for (const path of cliFiles) {
         (read(snapshot, path) ?? "").split("\n").forEach((line, i) => {
